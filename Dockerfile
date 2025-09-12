@@ -1,5 +1,5 @@
 # Многоступенчатая сборка
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
@@ -27,9 +27,6 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Создание пользователя
-RUN groupadd -r quiz && useradd -r -g quiz quiz
-
 # Рабочая директория
 WORKDIR /app
 
@@ -41,32 +38,35 @@ RUN mkdir -p /usr/share/fonts/truetype/ && \
     cp DejaVuSans.ttf /usr/share/fonts/truetype/ && \
     chmod 644 /usr/share/fonts/truetype/DejaVuSans.ttf
 
-# Настройка прав
-RUN chown -R quiz:quiz /app && \
-    chmod -R 755 /app && \
-    mkdir -p /var/log/nginx /var/lib/nginx && \
-    chown -R quiz:quiz /var/log/nginx /var/lib/nginx
+# Создание необходимых директорий для nginx с правильными правами
+RUN mkdir -p /var/log/nginx /var/lib/nginx /var/run/nginx && \
+    chown -R www-data:www-data /var/log/nginx /var/lib/nginx /var/run/nginx && \
+    chmod -R 755 /var/log/nginx /var/lib/nginx /var/run/nginx
 
-# Создание конфигурации nginx
-RUN echo 'worker_processes 1;\n\
-daemon off;\n\
+# Создание конфигурации nginx с правильным pid путем
+RUN echo 'worker_processes auto;\n\
+error_log /var/log/nginx/error.log notice;\n\
+pid /var/run/nginx/nginx.pid;\n\
 events { worker_connections 1024; }\n\
 http {\n\
-    include mime.types;\n\
+    include /etc/nginx/mime.types;\n\
     default_type application/octet-stream;\n\
     sendfile on;\n\
     keepalive_timeout 65;\n\
     access_log /var/log/nginx/access.log;\n\
-    error_log /var/log/nginx/error.log;\n\
+    \n\
     upstream flask_app { server 127.0.0.1:8000; }\n\
+    \n\
     server {\n\
         listen 8080;\n\
         server_name localhost;\n\
+        \n\
         location /static/ {\n\
             alias /app/static/;\n\
             expires 1d;\n\
             add_header Cache-Control "public";\n\
         }\n\
+        \n\
         location / {\n\
             proxy_pass http://flask_app;\n\
             proxy_set_header Host \$host;\n\
@@ -77,11 +77,15 @@ http {\n\
     }\n\
 }' > /etc/nginx/nginx.conf
 
+# Настройка прав для приложения
+RUN chown -R www-data:www-data /app && \
+    chmod -R 755 /app
+
 # Экспорт портов
 EXPOSE 8080
 
-# Переключение на непривилегированного пользователя
-USER quiz
+# Переключение на пользователя nginx
+USER www-data
 
-# Запуск приложения
-CMD nginx && python app.py --host=0.0.0.0 --port=8000
+# Запуск приложения через скрипт (исправленная команда)
+CMD nginx -g "daemon off;" & python app.py --host=0.0.0.0 --port=8000
