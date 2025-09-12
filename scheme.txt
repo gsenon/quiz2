@@ -1,7 +1,17 @@
-Flask==3.0.3
-Flask-WTF==1.2.1
-WTForms==3.1.2
-reportlab==4.2.2
-pandas==2.2.2
-openpyxl==3.1.5
-PyPDF2==3.0.1
+oprosnik_web/
+├── app.py                      # Основное Flask приложение
+├── DejaVuSans.ttf              # Шрифт для PDF (кириллица)
+├── quiz_data.json              # База данных вопросов
+├── question_generator.py       # Генератор вопросов
+├── requirements.txt            # Зависимости Python
+├── static/
+│   └── style.css              # Стили CSS
+└── templates/
+    ├── base.html              # Базовый шаблон
+    ├── index.html             # Главная страница
+    ├── quiz.html              # Страница вопроса
+    ├── results.html           # Результаты теста
+    └── admin/
+        ├── login.html         # Вход в админку
+        ├── dashboard.html     # Панель управления
+        └── add_edit.html      # Добавление/редактирование вопросов
