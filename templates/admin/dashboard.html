@@ -1,0 +1,41 @@
+
+{% extends "base.html" %}
+{% block title %}Админка — вопросы{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="admin-top">
+    <div>
+      <h1>Вопросы</h1>
+      <div class="muted">Сегодня: {{ today }}</div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="{{ url_for('admin_add') }}">Добавить вопрос</a>
+      <a class="btn-secondary" href="{{ url_for('admin_logout') }}">Выйти</a>
+    </div>
+  </div>
+
+  {% if questions %}
+  <div class="table">
+    <div class="thead">
+      <div>ID</div><div>Тип</div><div>Линия</div><div>Текст</div><div>Действия</div>
+    </div>
+    {% for q in questions %}
+      <div class="trow">
+        <div>{{ q.id }}</div>
+        <div>{{ {'single_choice':'1 ответ','multiple_choice':'неск.','fill_blank':'пропуск','open_question':'открыт.','matching':'соответ.'}[q.type] }}</div>
+        <div>{{ q.level }}</div>
+        <div class="ellipsis" title="{{ q.question }}">{{ q.question }}</div>
+        <div class="row-actions">
+          <a class="link" href="{{ url_for('admin_edit', qid=q.id) }}">Редактировать</a>
+          <form method="post" action="{{ url_for('admin_delete', qid=q.id) }}" onsubmit="return confirm('Удалить вопрос #{{ q.id }}?')" style="display:inline;">
+            <button class="link danger" type="submit">Удалить</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p>Пока нет вопросов.</p>
+  {% endif %}
+</section>
+{% endblock %}

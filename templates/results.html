@@ -1,0 +1,42 @@
+
+{% extends "base.html" %}
+{% block title %}Результаты{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Результаты</h1>
+  <p class="result-line">Итог: <strong>{{ percent }}%</strong> · Рекомендуемый уровень: <span class="pill">{{ level }}</span></p>
+  <a class="btn" href="{{ url_for('download_pdf') }}">Скачать PDF</a>
+
+  <h2>Детализация</h2>
+  <div class="table">
+    <div class="thead">
+      <div>Статус</div><div>Вопрос</div><div>Ваш ответ</div>
+    </div>
+    {% for r in rows %}
+      <div class="trow">
+        <div>{{ r.status }}</div>
+        <div>{{ r.q.question }}</div>
+        <div class="ua">
+          {% if r.q.type in ['single_choice'] %}
+            {{ r.ua or '—' }}
+          {% elif r.q.type == 'multiple_choice' %}
+            {{ r.ua|join(', ') if r.ua else '—' }}
+          {% elif r.q.type in ['fill_blank','open_question'] %}
+            {{ r.ua or '—' }}
+          {% elif r.q.type == 'matching' %}
+            {% if r.ua %}
+              {% for k,v in r.ua.items() %}
+                <div>{{ k }} → {{ v }}</div>
+              {% endfor %}
+            {% else %}—{% endif %}
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="actions">
+    <a class="btn-secondary" href="{{ url_for('index') }}">На главную</a>
+  </div>
+</section>
+{% endblock %}

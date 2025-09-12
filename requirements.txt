@@ -1,0 +1,7 @@
+Flask==3.0.3
+Flask-WTF==1.2.1
+WTForms==3.1.2
+reportlab==4.2.2
+pandas==2.2.2
+openpyxl==3.1.5
+PyPDF2==3.0.1

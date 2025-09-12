@@ -1,0 +1,53 @@
+
+{% extends "base.html" %}
+{% block title %}Вопрос {{ idx + 1 }}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="quiz-top">
+    <div>Вопрос {{ idx + 1 }} из {{ total }}</div>
+ <!--  <div class="pill">{{ {'single_choice':'Один ответ','multiple_choice':'Неск. ответов','fill_blank':'Заполнить','open_question':'Открытый','matching':'Сопоставление'}[q.type] }} · {{ q.level }}</div> -->
+  </div>
+
+  <h2 class="question">{{ q.question }}</h2>
+
+  <form method="post" class="form">
+    {% if q.type == 'single_choice' %}
+      {% for o in q.options %}
+        <label class="choice">
+          <input type="radio" name="opt" value="{{ o }}" required>
+          <span>{{ o }}</span>
+        </label>
+      {% endfor %}
+    {% elif q.type == 'multiple_choice' %}
+      {% for o in q.options %}
+        <label class="choice">
+          <input type="checkbox" name="opt" value="{{ o }}">
+          <span>{{ o }}</span>
+        </label>
+      {% endfor %}
+    {% elif q.type == 'fill_blank' %}
+      <input type="text" name="text" required placeholder="Ваш ответ">
+    {% elif q.type == 'open_question' %}
+      <textarea name="text" rows="5" required placeholder="Опишите ответ своими словами"></textarea>
+    {% elif q.type == 'matching' %}
+      {% set rights = q.pairs | map(attribute=1) | list %}
+      {% set shuffled = rights|shuffle %}
+      {% for pair in q.pairs %}
+        <div class="match-row">
+          <div class="left">{{ pair[0] }}</div>
+          <select name="match_{{ pair[0] }}" required>
+            <option value="" disabled selected>— выберите —</option>
+            {% for r in shuffled %}
+              <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="actions">
+      <button type="submit">Далее</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

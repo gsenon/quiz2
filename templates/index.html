@@ -1,0 +1,17 @@
+
+{% extends "base.html" %}
+{% block title %}Главная — Тест{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Тест по компонентам</h1>
+  <p>Введите ваше ФИО или email, чтобы начать. Данный тесе позволит выявить пробелы в знании архитектуры.</p>
+  <form method="post" action="{{ url_for('start_quiz') }}" class="form">
+    <label>ФИО или email</label>
+    <input type="text" name="name" required placeholder="Иванов Иван">
+    <div class="actions">
+      <button type="submit">Начать тест</button>
+      <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
