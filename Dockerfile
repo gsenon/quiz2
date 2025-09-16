@@ -23,14 +23,11 @@ RUN apt-get update && apt-get install -y \
     nginx \
     && rm -rf /var/lib/apt/lists/*
 
-# Копирование виртуального окружения
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Рабочая директория
 WORKDIR /app
 
-# Копирование файлов проекта
 COPY . .
 
 # Копирование шрифта
@@ -38,12 +35,12 @@ RUN mkdir -p /usr/share/fonts/truetype/ && \
     cp DejaVuSans.ttf /usr/share/fonts/truetype/ && \
     chmod 644 /usr/share/fonts/truetype/DejaVuSans.ttf
 
-# Создание необходимых директорий для nginx с правильными правами
+# Создание директорий для nginx 
 RUN mkdir -p /var/log/nginx /var/lib/nginx /var/run/nginx && \
     chown -R www-data:www-data /var/log/nginx /var/lib/nginx /var/run/nginx && \
     chmod -R 755 /var/log/nginx /var/lib/nginx /var/run/nginx
 
-# Создание конфигурации nginx с правильным pid путем
+# Создание конфига nginx
 RUN echo 'worker_processes auto;\n\
 error_log /var/log/nginx/error.log notice;\n\
 pid /var/run/nginx/nginx.pid;\n\
@@ -87,5 +84,5 @@ EXPOSE 8080
 # Переключение на пользователя nginx
 USER www-data
 
-# Запуск приложения через скрипт (исправленная команда)
+# Запуск приложения
 CMD nginx -g "daemon off;" & python app.py --host=0.0.0.0 --port=8000

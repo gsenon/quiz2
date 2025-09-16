@@ -431,7 +431,7 @@ def admin_edit_post(qid):
     new_q = _read_question_from_form()
     if not new_q:
         return redirect(url_for("admin_edit", qid=qid))
-    # проверка дубликата по тексту (игнорируя сам текущий)
+    # проверка дубликата по тексту
     if any(qq["id"] != qid and qq["question"].strip() == new_q["question"].strip() for qq in db["questions"]):
         flash("Вопрос с такой формулировкой уже существует", "error")
         return redirect(url_for("admin_edit", qid=qid))
@@ -467,7 +467,7 @@ def _read_question_from_form():
     if qtype in ("single_choice","multiple_choice"):
         options_raw = request.form.get("options","").strip()
         opts = [o.strip() for o in options_raw.split("\n") if o.strip()]
-        opts = list(dict.fromkeys(opts))  # уникальные, сохраняя порядок
+        opts = list(dict.fromkeys(opts))
         if len(opts) < 2:
             flash("Нужно минимум 2 варианта ответа", "error")
             return None
