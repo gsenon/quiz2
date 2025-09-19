@@ -64,30 +64,38 @@ def index():
 @app.post("/start")
 def start_quiz():
     settings = Config.load_settings()
+    logger.debug(f"Настройки доменной авторизации: {settings['domain_auth']}")
     
     if settings["domain_auth"]["enabled"]:
         # Доменная аутентификация
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         
+        logger.debug(f"Попытка доменной аутентификации для: {username}")
+        
         if not username or not password:
+            logger.warning("Не указаны логин или пароль домена")
             flash("Введите логин и пароль домена", "error")
             return redirect(url_for("index"))
         
         if not domain_auth.authenticate(username, password):
+            logger.warning(f"Неудачная аутентификация для: {username}")
             flash("Неверные учетные данные домена", "error")
             return redirect(url_for("index"))
         
         user_info = domain_auth.get_user_info(username)
         session["user_info"] = user_info
+        logger.info(f"Успешная аутентификация: {user_info}")
         
     else:
         # Старая аутентификация по ФИО
         name = request.form.get("name", "").strip()
         if not name:
+            logger.warning("Не указано ФИО или email")
             flash("Введите ФИО или email", "error")
             return redirect(url_for("index"))
         session["user_info"] = {"display_name": name, "username": name}
+        logger.info(f"Аутентификация по ФИО: {name}")
     
     # Выбор вопросов
     db = ensure_pool()
@@ -98,6 +106,8 @@ def start_quiz():
     session["quiz_qids"] = [q["id"] for q in selected]
     session["quiz_idx"] = 0
     session["answers"] = {}
+    
+    logger.debug(f"Выбрано {len(selected)} вопросов для тестирования")
     
     return redirect(url_for("quiz"))
 
