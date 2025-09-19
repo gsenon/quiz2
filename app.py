@@ -228,6 +228,12 @@ def results():
     questions_dict = {qid: pool[qid] for qid in qids}
     pdf_data = pdf_generator.generate_results_pdf(user_info, questions_dict, answers, results_data)
     
+    # Логирование для отладки
+    import logging
+    logging.debug(f"Сгенерирован PDF размером: {len(pdf_data)} байт")
+    logging.debug(f"Данные пользователя: {user_info}")
+    logging.debug(f"Настройки email: {Config.load_settings()['email']}")
+
     # Отправка email вместо скачивания
     if email_sender.send_results(user_info, pdf_data, results_data):
         flash("Результаты отправлены на вашу почту", "success")
@@ -433,5 +439,7 @@ def _read_question_from_form():
     return q
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
     ensure_pool()
     app.run(host="0.0.0.0", port=8000, debug=True)
