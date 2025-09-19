@@ -121,7 +121,7 @@ def start_quiz():
     # Выбор вопросов
     db = ensure_pool()
     pool = db["questions"]
-    count = min(2, len(pool)) #колличество вопросов
+    count = min(50, len(pool)) #колличество вопросов
     selected = random.sample(pool, count) if count > 0 else []
     
     session["quiz_qids"] = [q["id"] for q in selected]
