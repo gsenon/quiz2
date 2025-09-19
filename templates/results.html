@@ -1,11 +1,19 @@
-
 {% extends "base.html" %}
 {% block title %}Результаты{% endblock %}
 {% block content %}
 <section class="card">
   <h1>Результаты</h1>
   <p class="result-line">Итог: <strong>{{ percent }}%</strong> · Рекомендуемый уровень: <span class="pill">{{ level }}</span></p>
-  <a class="btn" href="{{ url_for('download_pdf') }}">Скачать PDF</a>
+  
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap">
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
 
   <h2>Детализация</h2>
   <div class="table">

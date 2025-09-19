@@ -1,17 +1,34 @@
-
 {% extends "base.html" %}
 {% block title %}Главная — Тест{% endblock %}
 {% block content %}
 <section class="card">
-  <h1>Тест по компонентам</h1>
-  <p>Введите ваше ФИО или email, чтобы начать. Данный тесе позволит выявить пробелы в знании архитектуры.</p>
-  <form method="post" action="{{ url_for('start_quiz') }}" class="form">
-    <label>ФИО или email</label>
-    <input type="text" name="name" required placeholder="Иванов Иван">
-    <div class="actions">
-      <button type="submit">Начать тест</button>
-      <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
-    </div>
-  </form>
+    <h1>Тест по компонентам</h1>
+    
+    {% if domain_auth_enabled %}
+        <p>Для начала теста выполните вход с учетными данными домена:</p>
+        <form method="post" action="{{ url_for('start_quiz') }}" class="form">
+            <label>Логин домена</label>
+            <input type="text" name="username" required placeholder="user123">
+            
+            <label>Пароль домена</label>
+            <input type="password" name="password" required>
+            
+            <div class="actions">
+                <button type="submit">Начать тест</button>
+                <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
+            </div>
+        </form>
+    {% else %}
+        <p>Введите ваше ФИО или email, чтобы начать:</p>
+        <form method="post" action="{{ url_for('start_quiz') }}" class="form">
+            <label>ФИО или email</label>
+            <input type="text" name="name" required placeholder="Иванов Иван">
+            
+            <div class="actions">
+                <button type="submit">Начать тест</button>
+                <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
+            </div>
+        </form>
+    {% endif %}
 </section>
 {% endblock %}

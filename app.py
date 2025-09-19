@@ -1,17 +1,14 @@
-
 # -*- coding: utf-8 -*-
 import os, json, random, io
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
-from question_generator import QuestionGenerator
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from jinja2 import Environment
 
-APP_SECRET = os.environ.get("APP_SECRET", "super_secret_key_change_me")
-DATA_FILE = "quiz_data.json"
+from config import Config
+from auth import DomainAuth
+from email_sender import EmailSender
+from pdf_generator import PDFGenerator
+from question_generator import QuestionGenerator
 
 def shuffle_filter(seq):
     try:
@@ -22,41 +19,28 @@ def shuffle_filter(seq):
         return seq
 
 app = Flask(__name__)
-app.secret_key = APP_SECRET
+app.secret_key = Config.APP_SECRET
+
+# Инициализация модулей
+domain_auth = DomainAuth()
+email_sender = EmailSender()
+pdf_generator = PDFGenerator()
 
 # Добавляем фильтр shuffle в Jinja2
 app.jinja_env.filters['shuffle'] = shuffle_filter
 
-# Регистрация шрифта после создания app
-try:
-    # Проверяем существует ли файл шрифта
-    if os.path.exists("DejaVuSans.ttf"):
-        pdfmetrics.registerFont(TTFont("DejaVuSans", "DejaVuSans.ttf"))
-        FONT_AVAILABLE = True
-        print("Шрифт DejaVuSans успешно зарегистрирован")
-    else:
-        FONT_AVAILABLE = False
-        print("Файл шрифта DejaVuSans.ttf не найден")
-except Exception as e:
-    FONT_AVAILABLE = False
-    print(f"Ошибка регистрации шрифта: {e}")
-
 # --------------- helpers ---------------
 def today_pass():
-    # Пароль = текущая дата в формате DDMMYYYY
-    return datetime.now().strftime("%d%m%Y")
+    return Config.today_pass()
 
 def load_db():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            db = json.load(f)
-    else:
-        db = {"questions": []}
-        save_db(db)
-    return db
+    if os.path.exists(Config.DATA_FILE):
+        with open(Config.DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"questions": []}
 
 def save_db(db):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+    with open(Config.DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=2)
 
 def ensure_pool():
@@ -74,24 +58,47 @@ def require_admin():
 # --------------- routes: public ---------------
 @app.get("/")
 def index():
-    return render_template("index.html")
+    settings = Config.load_settings()
+    return render_template("index.html", domain_auth_enabled=settings["domain_auth"]["enabled"])
 
 @app.post("/start")
 def start_quiz():
-    name = request.form.get("name", "").strip()
-    if not name:
-        flash("Введите ФИО или email.", "error")
-        return redirect(url_for("index"))
+    settings = Config.load_settings()
+    
+    if settings["domain_auth"]["enabled"]:
+        # Доменная аутентификация
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        
+        if not username or not password:
+            flash("Введите логин и пароль домена", "error")
+            return redirect(url_for("index"))
+        
+        if not domain_auth.authenticate(username, password):
+            flash("Неверные учетные данные домена", "error")
+            return redirect(url_for("index"))
+        
+        user_info = domain_auth.get_user_info(username)
+        session["user_info"] = user_info
+        
+    else:
+        # Старая аутентификация по ФИО
+        name = request.form.get("name", "").strip()
+        if not name:
+            flash("Введите ФИО или email", "error")
+            return redirect(url_for("index"))
+        session["user_info"] = {"display_name": name, "username": name}
+    
+    # Выбор вопросов
     db = ensure_pool()
     pool = db["questions"]
-    # Выбираем 50 случайных уникальных вопросов
     count = min(50, len(pool))
     selected = random.sample(pool, count) if count > 0 else []
-    # Сохраняем в сессию
-    session["quiz_name"] = name
+    
     session["quiz_qids"] = [q["id"] for q in selected]
     session["quiz_idx"] = 0
     session["answers"] = {}
+    
     return redirect(url_for("quiz"))
 
 @app.get("/quiz")
@@ -143,6 +150,7 @@ def quiz_post():
 def results():
     qids = session.get("quiz_qids", [])
     answers = session.get("answers", {})
+    user_info = session.get("user_info", {})
     db = ensure_pool()
     pool = {q["id"]: q for q in db["questions"]}
 
@@ -213,147 +221,20 @@ def results():
 
     percent = round(100.0 * score / max(1,total_weight), 2)
     level = "L2" if percent >= 80 else "L1"
-    session["result"] = {"percent": percent, "level": level}
-    return render_template("results.html", rows=rows, percent=percent, level=level)
-
-@app.get("/download")
-def download_pdf():
-    name = session.get("quiz_name", "Пользователь")
-    res = session.get("result", {"percent": 0, "level": "L1"})
-    qids = session.get("quiz_qids", [])
-    answers = session.get("answers", {})
-    db = ensure_pool()
-    pool = {q["id"]: q for q in db["questions"]}
+    results_data = {"percent": percent, "level": level}
+    session["result"] = results_data
     
-    buff = io.BytesIO()
-    c = canvas.Canvas(buff, pagesize=A4)
-    width, height = A4
-    margin = 40
-    y = height - margin
+    # Генерация PDF и отправка email
+    questions_dict = {qid: pool[qid] for qid in qids}
+    pdf_data = pdf_generator.generate_results_pdf(user_info, questions_dict, answers, results_data)
     
-    # Используем шрифт с поддержкой кириллицы
-    if FONT_AVAILABLE:
-        font_name = "DejaVuSans"
+    # Отправка email вместо скачивания
+    if email_sender.send_results(user_info, pdf_data, results_data):
+        flash("Результаты отправлены на вашу почту", "success")
     else:
-        font_name = "Helvetica"
+        flash("Ошибка отправки результатов", "error")
     
-    # Заголовок
-    c.setFont(font_name, 16)
-    c.drawString(margin, y, "Результаты теста")
-    y -= 30
-    
-    # Информация о пользователе
-    c.setFont(font_name, 12)
-    c.drawString(margin, y, f"Пользователь: {name}")
-    y -= 20
-    c.drawString(margin, y, f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
-    y -= 20
-    c.drawString(margin, y, f"Итог: {res['percent']}%  |  Уровень: {res['level']}")
-    y -= 30
-    
-    # Детализация ответов
-    c.setFont(font_name, 14)
-    c.drawString(margin, y, "Детализация ответов:")
-    y -= 30
-    
-    c.setFont(font_name, 10)
-    
-    for i, qid in enumerate(qids, 1):
-        q = pool[qid]
-        ua = answers.get(str(qid), "—")
-        
-        # Проверяем, достаточно ли места на странице
-        if y < 100:
-            c.showPage()
-            y = height - margin
-            c.setFont(font_name, 10)
-        
-        # Вопрос
-        question_text = f"{i}. {q['question']}"
-        # Разбиваем длинный вопрос на несколько строк
-        words = question_text.split()
-        lines = []
-        current_line = ""
-        
-        for word in words:
-            test_line = current_line + word + " "
-            if c.stringWidth(test_line, font_name, 10) < (width - 2 * margin):
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = word + " "
-        if current_line:
-            lines.append(current_line)
-        
-        # Выводим вопрос
-        for line in lines:
-            if y < 50:
-                c.showPage()
-                y = height - margin
-                c.setFont(font_name, 10)
-            c.drawString(margin, y, line)
-            y -= 15
-        
-        # Ответ пользователя
-        user_answer = f"Ваш ответ: {ua}"
-        if y < 50:
-            c.showPage()
-            y = height - margin
-            c.setFont(font_name, 10)
-        c.drawString(margin + 20, y, user_answer)
-        y -= 15
-        
-        # Правильный ответ
-        if q["type"] == "single_choice":
-            correct_answer = f"Правильный ответ: {q['correct'][0] if q.get('correct') else '—'}"
-        elif q["type"] == "multiple_choice":
-            correct_answer = f"Правильные ответы: {', '.join(q.get('correct', []))}"
-        elif q["type"] == "fill_blank":
-            correct_answer = f"Правильный ответ: {q['correct'][0] if q.get('correct') else '—'}"
-        elif q["type"] == "open_question":
-            correct_answer = f"Ключевые фразы: {', '.join(q.get('correct_phrases', []))}"
-        elif q["type"] == "matching":
-            pairs = [f"{p[0]} → {p[1]}" for p in q.get('pairs', [])]
-            correct_answer = f"Правильные пары: {', '.join(pairs)}"
-        else:
-            correct_answer = "Правильный ответ: —"
-        
-        # Разбиваем длинный правильный ответ на несколько строк
-        words = correct_answer.split()
-        correct_lines = []
-        current_line = ""
-        
-        for word in words:
-            test_line = current_line + word + " "
-            if c.stringWidth(test_line, font_name, 10) < (width - 2 * margin - 20):
-                current_line = test_line
-            else:
-                correct_lines.append(current_line)
-                current_line = word + " "
-        if current_line:
-            correct_lines.append(current_line)
-        
-        # Выводим правильный ответ
-        for line in correct_lines:
-            if y < 50:
-                c.showPage()
-                y = height - margin
-                c.setFont(font_name, 10)
-            c.drawString(margin + 20, y, line)
-            y -= 15
-        
-        # Разделитель между вопросами
-        y -= 10
-        if y < 50:
-            c.showPage()
-            y = height - margin
-            c.setFont(font_name, 10)
-        c.line(margin, y, width - margin, y)
-        y -= 15
-    
-    c.save()
-    buff.seek(0)
-    return send_file(buff, as_attachment=True, download_name=f"results_{name}.pdf")
+    return render_template("results.html", rows=rows, percent=percent, level=level)
 
 # --------------- routes: admin ---------------
 @app.get("/admin/login")
@@ -382,6 +263,41 @@ def admin_dashboard():
     db = ensure_pool()
     return render_template("admin/dashboard.html", questions=db["questions"], today=datetime.now().strftime("%d.%m.%Y"))
 
+@app.get("/admin/settings")
+def admin_settings():
+    if not require_admin():
+        return redirect(url_for("admin_login"))
+    
+    settings = Config.load_settings()
+    return render_template("admin/settings.html", settings=settings)
+
+@app.post("/admin/settings")
+def admin_settings_post():
+    if not require_admin():
+        return redirect(url_for("admin_login"))
+    
+    settings = Config.load_settings()
+    
+    # Обновление настроек домена
+    settings["domain_auth"]["enabled"] = request.form.get("domain_enabled") == "on"
+    settings["domain_auth"]["domain"] = request.form.get("domain", "")
+    settings["domain_auth"]["ldap_server"] = request.form.get("ldap_server", "")
+    settings["domain_auth"]["base_dn"] = request.form.get("base_dn", "")
+    
+    # Обновление настроек email
+    settings["email"]["enabled"] = request.form.get("email_enabled") == "on"
+    settings["email"]["smtp_server"] = request.form.get("smtp_server", "")
+    settings["email"]["smtp_port"] = int(request.form.get("smtp_port", 587))
+    settings["email"]["smtp_username"] = request.form.get("smtp_username", "")
+    settings["email"]["smtp_password"] = request.form.get("smtp_password", "")
+    settings["email"]["from_email"] = request.form.get("from_email", "")
+    settings["email"]["admin_emails"] = [e.strip() for e in request.form.get("admin_emails", "").split(",") if e.strip()]
+    settings["email"]["subject"] = request.form.get("email_subject", "Результаты тестирования")
+    
+    Config.save_settings(settings)
+    flash("Настройки сохранены", "success")
+    return redirect(url_for("admin_settings"))
+
 @app.get("/admin/add")
 def admin_add():
     if not require_admin():
@@ -405,7 +321,7 @@ def admin_add_post():
         return redirect(url_for("admin_add"))
     db["questions"].append(q)
     save_db(db)
-    flash("Вопрос добавлен", "ok")
+    flash("Вопрос добавлен", "success")
     return redirect(url_for("admin_dashboard"))
 
 @app.get("/admin/edit/<int:qid>")
@@ -440,7 +356,7 @@ def admin_edit_post(qid):
     idx = db["questions"].index(q)
     db["questions"][idx] = new_q
     save_db(db)
-    flash("Вопрос обновлён", "ok")
+    flash("Вопрос обновлён", "success")
     return redirect(url_for("admin_dashboard"))
 
 @app.post("/admin/delete/<int:qid>")
@@ -452,7 +368,10 @@ def admin_delete(qid):
     db["questions"] = [q for q in db["questions"] if q["id"] != qid]
     after = len(db["questions"])
     save_db(db)
-    flash("Вопрос удалён" if after < before else "Вопрос не найден", "ok" if after < before else "error")
+    if after < before:
+        flash("Вопрос удалён", "success")
+    else:
+        flash("Вопрос не найден", "error")
     return redirect(url_for("admin_dashboard"))
 
 def _read_question_from_form():

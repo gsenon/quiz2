@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="ru">
 <head>
@@ -13,7 +12,12 @@
       <div class="logo">📬 Mail Components Quiz</div>
       <nav>
         <a href="{{ url_for('index') }}">Главная</a>
-        <a href="{{ url_for('admin_dashboard') }}">Админка</a>
+        {% if session.get('is_admin') %}
+          <a href="{{ url_for('admin_dashboard') }}">Вопросы</a>
+          <a href="{{ url_for('admin_settings') }}">Настройки</a>
+        {% else %}
+          <a href="{{ url_for('admin_login') }}">Админка</a>
+        {% endif %}
       </nav>
     </div>
   </header>

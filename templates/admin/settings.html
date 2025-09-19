@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<section class="card">
+    <h1>Настройки системы</h1>
+    
+    <form method="post" class="form">
+        <h2>Доменная авторизация</h2>
+        <label>
+            <input type="checkbox" name="domain_enabled" {{ 'checked' if settings.domain_auth.enabled }}>
+            Включить доменную авторизацию
+        </label>
+        
+        <label>Домен</label>
+        <input type="text" name="domain" value="{{ settings.domain_auth.domain }}" placeholder="example.com">
+        
+        <label>LDAP сервер</label>
+        <input type="text" name="ldap_server" value="{{ settings.domain_auth.ldap_server }}" placeholder="ldap://dc.example.com">
+        
+        <label>Base DN</label>
+        <input type="text" name="base_dn" value="{{ settings.domain_auth.base_dn }}" placeholder="dc=example,dc=com">
+        
+        <h2>Настройки email</h2>
+        <label>
+            <input type="checkbox" name="email_enabled" {{ 'checked' if settings.email.enabled }}>
+            Включить отправку email
+        </label>
+        
+        <label>SMTP сервер</label>
+        <input type="text" name="smtp_server" value="{{ settings.email.smtp_server }}" placeholder="smtp.gmail.com">
+        
+        <label>SMTP порт</label>
+        <input type="number" name="smtp_port" value="{{ settings.email.smtp_port }}">
+        
+        <label>SMTP пользователь</label>
+        <input type="text" name="smtp_username" value="{{ settings.email.smtp_username }}">
+        
+        <label>SMTP пароль</label>
+        <input type="password" name="smtp_password" value="{{ settings.email.smtp_password }}">
+        
+        <label>Email отправителя</label>
+        <input type="email" name="from_email" value="{{ settings.email.from_email }}">
+        
+        <label>Email администраторов (через запятую)</label>
+        <input type="text" name="admin_emails" value="{{ settings.email.admin_emails | join(',') }}">
+        
+        <label>Тема письма</label>
+        <input type="text" name="email_subject" value="{{ settings.email.subject }}">
+        
+        <div class="actions">
+            <button type="submit">Сохранить настройки</button>
+            <a class="btn-secondary" href="{{ url_for('admin_dashboard') }}">Отмена</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

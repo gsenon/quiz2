@@ -1,0 +1,20 @@
+{
+  "domain_auth": {
+    "enabled": false,
+    "domain": "",
+    "ldap_server": "",
+    "base_dn": ""
+  },
+  "email": {
+    "enabled": true,
+    "smtp_server": "mail.rambler-co.ru",
+    "smtp_port": 587,
+    "smtp_username": "k.skachilov@rambler-co.ru",
+    "smtp_password": "Kir090292ilL!",
+    "from_email": "k.skachilov@rambler-co.ru",
+    "admin_emails": [
+      "k.skachilov@rambler-co.ru"
+    ],
+    "subject": "Результаты тестирования"
+  }
+}
