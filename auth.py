@@ -2,6 +2,8 @@
 import ldap
 import logging
 import base64
+import hashlib
+import time
 from config import Config
 
 # Настройка логирования
@@ -25,8 +27,6 @@ class DomainAuth:
         # Безопасное логирование
         password_hash = base64.b64encode(password.encode()).decode() if password else "empty"
         logger.debug(f"Попытка аутентификации пользователя: {username}, пароль (base64): {password_hash}")
-        logger.debug(f"LDAP сервер: {ldap_server}")
-        logger.debug(f"Base DN: {base_dn}")
         
         if not ldap_server:
             logger.error("LDAP сервер не настроен")
@@ -57,14 +57,6 @@ class DomainAuth:
             
             conn.simple_bind_s(user_dn, password)
             logger.info(f"Успешная аутентификация пользователя: {username}")
-            
-            # Дополнительная информация о пользователе (опционально)
-            try:
-                search_filter = f"(cn={username})"
-                result = conn.search_s(base_dn, ldap.SCOPE_SUBTREE, search_filter)
-                logger.debug(f"Найдено записей пользователя: {len(result) if result else 0}")
-            except Exception as search_error:
-                logger.warning(f"Не удалось получить дополнительную информацию о пользователе: {search_error}")
             
             conn.unbind()
             logger.debug("LDAP соединение закрыто")
@@ -100,3 +92,30 @@ class DomainAuth:
         
         logger.debug(f"Информация о пользователе: username={user_info['username']}, email={user_info['email']}")
         return user_info
+    
+    def create_session_token(self, username):
+        """Создает сессионный токен на основе имени пользователя и времени"""
+        timestamp = str(int(time.time()))
+        token_data = f"{username}:{timestamp}:{Config.APP_SECRET}"
+        session_token = hashlib.sha256(token_data.encode()).hexdigest()
+        logger.debug(f"Создан сессионный токен для пользователя: {username}")
+        return session_token
+    
+    def validate_session_token(self, session_token, username):
+        """Проверяет валидность сессионного токена"""
+        try:
+            # Токен действителен в течение 24 часов
+            current_time = int(time.time())
+            valid_tokens = []
+            
+            # Генерируем токены за последние 24 часа
+            for i in range(0, 86400, 3600):  # Каждый час в течение 24 часов
+                timestamp = str(current_time - i)
+                token_data = f"{username}:{timestamp}:{Config.APP_SECRET}"
+                valid_tokens.append(hashlib.sha256(token_data.encode()).hexdigest())
+            
+            return session_token in valid_tokens
+            
+        except Exception as e:
+            logger.error(f"Ошибка валидации токена: {str(e)}")
+            return False

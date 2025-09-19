@@ -83,7 +83,9 @@ class EmailSender:
                 logger.debug("Успешная авторизация на SMTP сервере")
                 
                 recipients = [user_info.get("email", "")] + email_settings["admin_emails"]
-                logger.debug(f"Получатели: {recipients}")
+                # Безопасное логирование получателей
+                safe_recipients = [r if '@' not in r else r.split('@')[0] + '@***' for r in recipients]
+                logger.debug(f"Получатели: {safe_recipients}")
                 
                 server.sendmail(email_settings["from_email"], recipients, msg.as_string())
                 logger.info(f"Email успешно отправлен пользователю {user_info['username']}")

@@ -7,6 +7,7 @@ class Config:
     APP_SECRET = os.environ.get("APP_SECRET", "super_secret_key_change_me")
     DATA_FILE = "quiz_data.json"
     SETTINGS_FILE = "settings.json"
+    SESSION_TIMEOUT = 86400  # 24 часа в секундах
     
     # Настройки по умолчанию
     DEFAULT_SETTINGS = {

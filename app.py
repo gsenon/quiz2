@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, json, random, io
-from datetime import datetime
 import logging
 import base64
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from jinja2 import Environment
 
@@ -20,6 +20,8 @@ def shuffle_filter(seq):
     except:
         return seq
 
+
+
 app = Flask(__name__)
 app.secret_key = Config.APP_SECRET
 
@@ -27,6 +29,7 @@ app.secret_key = Config.APP_SECRET
 domain_auth = DomainAuth()
 email_sender = EmailSender()
 pdf_generator = PDFGenerator()
+# Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -89,8 +92,18 @@ def start_quiz():
             flash("Неверные учетные данные домена", "error")
             return redirect(url_for("index"))
         
+        # Получаем информацию о пользователе
         user_info = domain_auth.get_user_info(username)
+        
+        # Создаем сессионный токен вместо хранения пароля
+        session_token = domain_auth.create_session_token(username)
+        
+        # Сохраняем в сессии только необходимые данные
         session["user_info"] = user_info
+        session["auth_token"] = session_token
+        session["username"] = username
+        session["authenticated"] = True
+        
         logger.info(f"Успешная аутентификация пользователя: {username}")
         
     else:
@@ -100,13 +113,15 @@ def start_quiz():
             logger.warning("Не указано ФИО или email")
             flash("Введите ФИО или email", "error")
             return redirect(url_for("index"))
+        
         session["user_info"] = {"display_name": name, "username": name}
+        session["authenticated"] = True
         logger.info(f"Аутентификация по ФИО: {name}")
     
     # Выбор вопросов
     db = ensure_pool()
     pool = db["questions"]
-    count = min(50, len(pool))
+    count = min(2, len(pool)) #колличество вопросов
     selected = random.sample(pool, count) if count > 0 else []
     
     session["quiz_qids"] = [q["id"] for q in selected]
@@ -245,11 +260,22 @@ def results():
     pdf_data = pdf_generator.generate_results_pdf(user_info, questions_dict, answers, results_data)
     
     # Логирование для отладки
-    import logging
-    logging.debug(f"Сгенерирован PDF размером: {len(pdf_data)} байт")
-    logging.debug(f"Данные пользователя: {user_info}")
-    logging.debug(f"Настройки email: {Config.load_settings()['email']}")
-
+    logger.debug(f"Сгенерирован PDF размером: {len(pdf_data)} байт")
+    
+    # Безопасное логирование пользовательских данных
+    safe_user_info = user_info.copy()
+    if 'email' in safe_user_info and safe_user_info['email']:
+        safe_user_info['email'] = safe_user_info['email'].split('@')[0] + '@***'
+    logger.debug(f"Данные пользователя: {safe_user_info}")
+    
+    # Безопасное логирование email настроек
+    email_settings = Config.load_settings()["email"].copy()
+    if email_settings["smtp_password"]:
+        email_settings["smtp_password"] = "***"
+    if email_settings["smtp_username"]:
+        email_settings["smtp_username"] = email_settings["smtp_username"].split('@')[0] + '@***'
+    logger.debug(f"Настройки email: {email_settings}")
+    
     # Отправка email вместо скачивания
     if email_sender.send_results(user_info, pdf_data, results_data):
         flash("Результаты отправлены на вашу почту", "success")
@@ -257,6 +283,37 @@ def results():
         flash("Ошибка отправки результатов", "error")
     
     return render_template("results.html", rows=rows, percent=percent, level=level)
+
+# Middleware для проверки аутентификации
+@app.before_request
+def check_authentication():
+    # Не проверяем аутентификацию для публичных маршрутов
+    public_routes = ['index', 'start', 'quiz', 'quiz_post', 'results', 
+                    'admin_login', 'admin_login_post', 'static']
+    
+    if request.endpoint in public_routes:
+        return
+    
+    # Для админских маршрутов проверяем is_admin
+    if request.endpoint and request.endpoint.startswith('admin_'):
+        if not session.get('is_admin'):
+            logger.warning(f"Попытка доступа к админ-маршруту без прав: {request.endpoint}")
+            flash("Требуются права администратора", "error")
+            return redirect(url_for('admin_login'))
+    
+    # Проверяем аутентификацию для защищенных маршрутов
+    if not session.get('authenticated'):
+        logger.warning(f"Попытка доступа к защищенному маршруту без аутентификации: {request.endpoint}")
+        flash("Требуется аутентификация", "error")
+        return redirect(url_for('index'))
+    
+    # Для доменной авторизации проверяем сессионный токен
+    if session.get('username') and session.get('auth_token'):
+        if not domain_auth.validate_session_token(session['auth_token'], session['username']):
+            logger.warning(f"Невалидный сессионный токен для пользователя: {session['username']}")
+            session.clear()
+            flash("Сессия истекла, пожалуйста, войдите снова", "error")
+            return redirect(url_for('index'))
 
 # --------------- routes: admin ---------------
 @app.get("/admin/login")
@@ -269,13 +326,20 @@ def admin_login_post():
     pwd = request.form.get("password","").strip()
     if login == "admin" and pwd == today_pass():
         session["is_admin"] = True
+        session["authenticated"] = True  # Добавьте эту строку
+        session["username"] = "admin"    # Добавьте эту строку
+        logger.info(f"Успешный вход в админку пользователя: {login}")
         return redirect(url_for("admin_dashboard"))
     flash("Неверные учетные данные", "error")
+    logger.warning(f"Неудачная попытка входа в админку: {login}")
     return redirect(url_for("admin_login"))
 
 @app.get("/admin/logout")
 def admin_logout():
+    username = session.get('username', 'unknown')
     session.clear()
+    logger.info(f"Пользователь {username} вышел из системы")
+    flash("Вы успешно вышли из системы", "success")
     return redirect(url_for("index"))
 
 @app.get("/admin")
@@ -417,45 +481,39 @@ def _read_question_from_form():
         if not correct_list:
             flash("Укажите правильные ответы (каждый с новой строки)", "error")
             return None
-        if not set(correct_list).issubset(set(opts)):
-            flash("Все правильные ответы должны присутствовать среди вариантов", "error")
-            return None
-        if qtype == "single_choice" and len(correct_list) != 1:
-            flash("Для типа 'один ответ' должен быть ровно один правильный", "error")
+        if qtype == "single_choice" and len(correct_list) > 1:
+            flash("Для single_choice должен быть только один правильный ответ", "error")
             return None
         q["options"] = opts
         q["correct"] = correct_list
     elif qtype == "fill_blank":
-        correct = (request.form.get("correct_single") or "").strip()
+        correct = (request.form.get("correct") or "").strip()
         if not correct:
-            flash("Укажите правильное значение для заполняемого поля", "error")
+            flash("Укажите правильный ответ", "error")
             return None
         q["correct"] = [correct]
     elif qtype == "open_question":
-        phrases_raw = request.form.get("phrases","").strip()
-        phrases = [p.strip() for p in phrases_raw.split("\n") if p.strip()]
-        if not phrases:
-            flash("Добавьте ключевые фразы для проверки открытого ответа", "error")
+        correct_phrases_raw = request.form.get("correct_phrases","").strip()
+        correct_phrases = [p.strip() for p in correct_phrases_raw.split("\n") if p.strip()]
+        if not correct_phrases:
+            flash("Укажите ключевые фразы (каждая с новой строки)", "error")
             return None
-        q["correct_phrases"] = phrases
+        q["correct_phrases"] = correct_phrases
     elif qtype == "matching":
         pairs_raw = request.form.get("pairs","").strip()
         pairs = []
         for line in pairs_raw.split("\n"):
-            if "->" in line:
-                left, right = line.split("->", 1)
-                pairs.append([left.strip(), right.strip()])
-        if not pairs:
-            flash("Добавьте хотя бы одну пару в формате A->B", "error")
+            parts = line.strip().split(":")
+            if len(parts) >= 2:
+                left = parts[0].strip()
+                right = parts[1].strip()
+                if left and right:
+                    pairs.append([left, right])
+        if len(pairs) < 2:
+            flash("Нужно минимум 2 пары", "error")
             return None
         q["pairs"] = pairs
-    else:
-        flash("Неизвестный тип вопроса", "error")
-        return None
     return q
 
 if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.DEBUG)
-    ensure_pool()
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(debug=True, host="0.0.0.0", port=8000)

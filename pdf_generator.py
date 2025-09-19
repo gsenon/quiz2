@@ -19,7 +19,7 @@ class PDFGenerator:
                 self.font_available = True
                 print("Шрифт DejaVuSans успешно зарегистрирован")
             else:
-                print("Файл шрифта DejaVuSans.ttf не найден")
+                print("Файл шрифта DejaVuSans.ttf не найден, используется Helvetica")
         except Exception as e:
             print(f"Ошибка регистрации шрифта: {e}")
     
