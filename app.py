@@ -2,6 +2,7 @@
 import os, json, random, io
 from datetime import datetime
 import logging
+import base64
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from jinja2 import Environment
 
