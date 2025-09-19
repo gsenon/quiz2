@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import smtplib
 import logging
+import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -13,7 +14,11 @@ logger = logging.getLogger(__name__)
 class EmailSender:
     def __init__(self):
         self.settings = Config.load_settings()
-        logger.debug(f"Загружены настройки email: {self.settings['email']}")
+        # Безопасное логирование настроек
+        email_settings = self.settings["email"].copy()
+        if email_settings["smtp_password"]:
+            email_settings["smtp_password"] = "***"  # Скрываем пароль
+        logger.debug(f"Загружены настройки email: enabled={email_settings['enabled']}, server={email_settings['smtp_server']}")
     
     def send_results(self, user_info, pdf_data, results):
         if not self.settings["email"]["enabled"]:
@@ -22,7 +27,7 @@ class EmailSender:
         
         try:
             email_settings = self.settings["email"]
-            logger.debug(f"Попытка отправки email для пользователя: {user_info}")
+            logger.debug(f"Попытка отправки email для пользователя: {user_info['username']}")
             
             # Проверка обязательных параметров
             if not email_settings["smtp_server"]:
@@ -72,6 +77,8 @@ class EmailSender:
                 server.starttls()
                 logger.debug("STARTTLS выполнен")
                 
+                # Безопасное логирование авторизации
+                logger.debug(f"Авторизация пользователя: {email_settings['smtp_username']}")
                 server.login(email_settings["smtp_username"], email_settings["smtp_password"])
                 logger.debug("Успешная авторизация на SMTP сервере")
                 
@@ -96,5 +103,5 @@ class EmailSender:
             logger.error(f"Ошибка SMTP: {e}")
             return False
         except Exception as e:
-            logger.error(f"Неожиданная ошибка отправки email: {e}", exc_info=True)
+            logger.error(f"Неожиданная ошибка отправки email: {str(e)}")
             return False

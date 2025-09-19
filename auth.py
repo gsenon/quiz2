@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import ldap
 import logging
+import base64
 from config import Config
 
 # Настройка логирования
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 class DomainAuth:
     def __init__(self):
         self.settings = Config.load_settings()
-        logger.debug(f"Загружены настройки доменной авторизации: {self.settings['domain_auth']}")
+        logger.debug(f"Загружены настройки доменной авторизации: enabled={self.settings['domain_auth']['enabled']}, server={self.settings['domain_auth']['ldap_server']}")
     
     def authenticate(self, username, password):
         if not self.settings["domain_auth"]["enabled"]:
@@ -21,7 +22,9 @@ class DomainAuth:
         ldap_server = domain_settings["ldap_server"]
         base_dn = domain_settings["base_dn"]
         
-        logger.debug(f"Попытка аутентификации пользователя: {username}")
+        # Безопасное логирование
+        password_hash = base64.b64encode(password.encode()).decode() if password else "empty"
+        logger.debug(f"Попытка аутентификации пользователя: {username}, пароль (base64): {password_hash}")
         logger.debug(f"LDAP сервер: {ldap_server}")
         logger.debug(f"Base DN: {base_dn}")
         
@@ -33,8 +36,12 @@ class DomainAuth:
             logger.error("Base DN не настроен")
             return False
         
-        if not username or not password:
-            logger.error("Не указаны логин или пароль")
+        if not username:
+            logger.error("Не указан логин")
+            return False
+        
+        if not password:
+            logger.error("Пароль не указан")
             return False
         
         try:
@@ -55,7 +62,7 @@ class DomainAuth:
             try:
                 search_filter = f"(cn={username})"
                 result = conn.search_s(base_dn, ldap.SCOPE_SUBTREE, search_filter)
-                logger.debug(f"Результат поиска пользователя: {result}")
+                logger.debug(f"Найдено записей пользователя: {len(result) if result else 0}")
             except Exception as search_error:
                 logger.warning(f"Не удалось получить дополнительную информацию о пользователе: {search_error}")
             
@@ -73,27 +80,23 @@ class DomainAuth:
             return False
             
         except ldap.LDAPError as e:
-            logger.error(f"Ошибка LDAP: {e}")
-            # Детализация ошибок LDAP
-            if hasattr(e, 'message'):
-                if 'desc' in e.message:
-                    logger.error(f"Описание ошибки LDAP: {e.message['desc']}")
+            error_desc = getattr(e, 'message', {}).get('desc', str(e))
+            logger.error(f"Ошибка LDAP: {error_desc}")
             return False
             
         except Exception as e:
-            logger.error(f"Неожиданная ошибка аутентификации: {e}", exc_info=True)
+            logger.error(f"Неожиданная ошибка аутентификации: {str(e)}")
             return False
     
     def get_user_info(self, username):
         logger.debug(f"Получение информации о пользователе: {username}")
         
         # Здесь можно добавить реальное получение информации из AD
-        # Пока возвращаем базовую информацию
         user_info = {
             "username": username,
             "display_name": username,
             "email": f"{username}@domain.com"
         }
         
-        logger.debug(f"Информация о пользователе: {user_info}")
+        logger.debug(f"Информация о пользователе: username={user_info['username']}, email={user_info['email']}")
         return user_info

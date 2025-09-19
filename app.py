@@ -67,14 +67,16 @@ def index():
 @app.post("/start")
 def start_quiz():
     settings = Config.load_settings()
-    logger.debug(f"Настройки доменной авторизации: {settings['domain_auth']}")
+    logger.debug(f"Настройки доменной авторизации: enabled={settings['domain_auth']['enabled']}")
     
     if settings["domain_auth"]["enabled"]:
         # Доменная аутентификация
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         
-        logger.debug(f"Попытка доменной аутентификации для: {username}")
+        # Безопасное логирование пароля
+        password_hash = base64.b64encode(password.encode()).decode() if password else "empty"
+        logger.debug(f"Попытка доменной аутентификации для: {username}, пароль (base64): {password_hash}")
         
         if not username or not password:
             logger.warning("Не указаны логин или пароль домена")
@@ -88,7 +90,7 @@ def start_quiz():
         
         user_info = domain_auth.get_user_info(username)
         session["user_info"] = user_info
-        logger.info(f"Успешная аутентификация: {user_info}")
+        logger.info(f"Успешная аутентификация пользователя: {username}")
         
     else:
         # Старая аутентификация по ФИО
