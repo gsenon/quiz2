@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, json, random, io
 from datetime import datetime
+import logging
 from flask import Flask, render_template, request, redirect, url_for, session, send_file, flash
 from jinja2 import Environment
 
@@ -25,6 +26,8 @@ app.secret_key = Config.APP_SECRET
 domain_auth = DomainAuth()
 email_sender = EmailSender()
 pdf_generator = PDFGenerator()
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Добавляем фильтр shuffle в Jinja2
 app.jinja_env.filters['shuffle'] = shuffle_filter
