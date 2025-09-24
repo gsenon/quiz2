@@ -5,7 +5,7 @@ metadata:
   labels:
     app: quiz
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: quiz
@@ -24,7 +24,7 @@ spec:
         - configMapRef:
             name: quiz-config
         - secretRef:
-            name: quiz-secret
+            name: quiz-db-secret
         livenessProbe:
           httpGet:
             path: /healthz
