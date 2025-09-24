@@ -1,34 +1,38 @@
 {% extends "base.html" %}
-{% block title %}Главная — Тест{% endblock %}
+{% block title %}Вход в систему тестирования{% endblock %}
 {% block content %}
 <section class="card">
-    <h1>Тест по компонентам</h1>
+    <h1>Вход в систему тестирования</h1>
     
     {% if domain_auth_enabled %}
-        <p>Для начала теста выполните вход с учетными данными домена:</p>
-        <form method="post" action="{{ url_for('start_quiz') }}" class="form">
-            <label>Логин домена</label>
-            <input type="text" name="username" required placeholder="user123">
-            
-            <label>Пароль домена</label>
-            <input type="password" name="password" required>
-            
-            <div class="actions">
-                <button type="submit">Начать тест</button>
-                <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
-            </div>
-        </form>
+    <p>Для доступа к тестированию используйте доменную авторизацию:</p>
+    <form method="post" action="{{ url_for('start_test') }}">
+        <div class="form-group">
+            <label for="username">Email в домене:</label>
+            <input type="text" id="username" name="username" required 
+                   placeholder="username@domain.ru" autocomplete="username">
+        </div>
+        <button type="submit" class="btn">Начать тестирование</button>
+    </form>
     {% else %}
-        <p>Введите ваше ФИО или email, чтобы начать:</p>
-        <form method="post" action="{{ url_for('start_quiz') }}" class="form">
-            <label>ФИО или email</label>
-            <input type="text" name="name" required placeholder="Иванов Иван">
-            
-            <div class="actions">
-                <button type="submit">Начать тест</button>
-                <a class="btn-secondary" href="{{ url_for('admin_login') }}">Войти в админку</a>
-            </div>
-        </form>
+    <p>Для доступа к тестированию введите ваше ФИО:</p>
+    <form method="post" action="{{ url_for('start_test') }}">
+        <div class="form-group">
+            <label for="username">ФИО:</label>
+            <input type="text" id="username" name="username" required 
+                   placeholder="Иванов Иван Иванович" autocomplete="name">
+        </div>
+        <button type="submit" class="btn">Начать тестирование</button>
+    </form>
     {% endif %}
+    
+    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+        <p><strong>Информация:</strong></p>
+        {% if domain_auth_enabled %}
+        <p>Используется доменная авторизация. Введите ваш корпоративный email.</p>
+        {% else %}
+        <p>Используется простая авторизация по ФИО.</p>
+        {% endif %}
+    </div>
 </section>
 {% endblock %}

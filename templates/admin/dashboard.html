@@ -1,41 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Админка — вопросы{% endblock %}
+{% block title %}Панель администратора{% endblock %}
 {% block content %}
 <section class="card">
-  <div class="admin-top">
-    <div>
-      <h1>Вопросы</h1>
-      <div class="muted">Сегодня: {{ today }}</div>
+    <h1>Панель администратора</h1>
+    
+    <div class="stats">
+        <p><strong>Дата:</strong> {{ today }}</p>
+        <p><strong>Всего вопросов в базе:</strong> {{ questions|length }}</p>
     </div>
-    <div class="actions">
-      <a class="btn" href="{{ url_for('admin_add') }}">Добавить вопрос</a>
-      <a class="btn-secondary" href="{{ url_for('admin_settings') }}">Настройки</a>
-      <a class="btn-secondary" href="{{ url_for('admin_logout') }}">Выйти</a>
+    
+    <div class="admin-links" style="margin-top: 20px;">
+        <a href="{{ url_for('admin_settings') }}" class="btn">Настройки системы</a>
     </div>
-  </div>
+</section>
 
-  {% if questions %}
-  <div class="table">
-    <div class="thead">
-      <div>ID</div><div>Тип</div><div>Линия</div><div>Текст</div><div>Действия</div>
+<section class="card">
+    <h2>База вопросов</h2>
+    
+    <div style="max-height: 400px; overflow-y: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f5f5f5;">
+                    <th style="padding: 10px; border: 1px solid #ddd;">ID</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Вопрос</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Тип</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Категория</th>
+                    <th style="padding: 10px; border: 1px solid #ddd;">Уровень</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for q in questions[:100] %}  {# Показываем первые 100 #}
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{{ q.id }}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{{ q.question[:50] }}...</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{{ q.type }}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{{ q.category }}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{{ q.level }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-    {% for q in questions %}
-      <div class="trow">
-        <div>{{ q.id }}</div>
-        <div>{{ {'single_choice':'1 ответ','multiple_choice':'неск.','fill_blank':'пропуск','open_question':'открыт.','matching':'соответ.'}[q.type] }}</div>
-        <div>{{ q.level }}</div>
-        <div class="ellipsis" title="{{ q.question }}">{{ q.question }}</div>
-        <div class="row-actions">
-          <a class="link" href="{{ url_for('admin_edit', qid=q.id) }}">Редактировать</a>
-          <form method="post" action="{{ url_for('admin_delete', qid=q.id) }}" onsubmit="return confirm('Удалить вопрос #{{ q.id }}?')" style="display:inline;">
-            <button class="link danger" type="submit">Удалить</button>
-          </form>
-        </div>
-      </div>
-    {% endfor %}
-  </div>
-  {% else %}
-    <p>Пока нет вопросов.</p>
-  {% endif %}
+    
+    <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+        Показано первых 100 вопросов из {{ questions|length }}
+    </p>
 </section>
 {% endblock %}

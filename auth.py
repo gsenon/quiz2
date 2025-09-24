@@ -1,121 +1,138 @@
 # -*- coding: utf-8 -*-
-import ldap
 import logging
-import base64
 import hashlib
 import time
+import json
+from datetime import datetime, timedelta
 from config import Config
+from models import db, Setting
 
-# Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-class DomainAuth:
+class AuthSystem:
     def __init__(self):
-        self.settings = Config.load_settings()
-        logger.debug(f"Загружены настройки доменной авторизации: enabled={self.settings['domain_auth']['enabled']}, server={self.settings['domain_auth']['ldap_server']}")
+        self.pending_admin_logins = {}
+        logger.debug("Инициализирована система аутентификации")
     
-    def authenticate(self, username, password):
-        if not self.settings["domain_auth"]["enabled"]:
-            logger.warning("Доменная авторизация отключена в настройках")
-            return False
-        
-        domain_settings = self.settings["domain_auth"]
-        ldap_server = domain_settings["ldap_server"]
-        base_dn = domain_settings["base_dn"]
-        
-        # Безопасное логирование
-        password_hash = base64.b64encode(password.encode()).decode() if password else "empty"
-        logger.debug(f"Попытка аутентификации пользователя: {username}, пароль (base64): {password_hash}")
-        
-        if not ldap_server:
-            logger.error("LDAP сервер не настроен")
-            return False
-        
-        if not base_dn:
-            logger.error("Base DN не настроен")
-            return False
-        
-        if not username:
-            logger.error("Не указан логин")
-            return False
-        
-        if not password:
-            logger.error("Пароль не указан")
-            return False
-        
+    def get_settings(self):
+        """Получение настроек из БД"""
         try:
-            # Подключение к LDAP
-            logger.debug(f"Инициализация подключения к LDAP: {ldap_server}")
-            conn = ldap.initialize(ldap_server)
-            conn.protocol_version = ldap.VERSION3
-            conn.set_option(ldap.OPT_REFERRALS, 0)
-            
-            # Попытка привязки (аутентификации)
-            user_dn = f"cn={username},{base_dn}"
-            logger.debug(f"Попытка привязки с DN: {user_dn}")
-            
-            conn.simple_bind_s(user_dn, password)
-            logger.info(f"Успешная аутентификация пользователя: {username}")
-            
-            conn.unbind()
-            logger.debug("LDAP соединение закрыто")
-            
-            return True
-            
-        except ldap.INVALID_CREDENTIALS:
-            logger.error(f"Неверные учетные данные для пользователя: {username}")
-            return False
-            
-        except ldap.SERVER_DOWN:
-            logger.error(f"LDAP сервер недоступен: {ldap_server}")
-            return False
-            
-        except ldap.LDAPError as e:
-            error_desc = getattr(e, 'message', {}).get('desc', str(e))
-            logger.error(f"Ошибка LDAP: {error_desc}")
-            return False
-            
+            auth_settings = Setting.query.filter_by(key='auth').first()
+            if auth_settings:
+                return json.loads(auth_settings.value)
+            return Config.DEFAULT_SETTINGS['auth']
         except Exception as e:
-            logger.error(f"Неожиданная ошибка аутентификации: {str(e)}")
-            return False
+            logger.error(f"Ошибка получения настроек: {e}")
+            return Config.DEFAULT_SETTINGS['auth']
     
-    def get_user_info(self, username):
-        logger.debug(f"Получение информации о пользователе: {username}")
+    def initiate_admin_login(self, username):
+        """Инициация процесса входа в админку"""
+        if not username:
+            logger.error("Пустой username для админки")
+            return False
         
-        # Здесь можно добавить реальное получение информации из AD
-        user_info = {
-            "username": username,
-            "display_name": username,
-            "email": f"{username}@domain.com"
+        if not Config.is_super_user(username):
+            logger.error(f"Пользователь {username} не является суперпользователем")
+            return False
+        
+        code = Config.generate_code()
+        expiration = datetime.now() + timedelta(minutes=10)
+        
+        self.pending_admin_logins[username] = {
+            'code': code,
+            'expires': expiration,
+            'attempts': 0
         }
         
-        logger.debug(f"Информация о пользователе: username={user_info['username']}, email={user_info['email']}")
+        logger.debug(f"Сгенерирован код для админки {username}: {code}")
+        return code
+    
+    def verify_admin_code(self, username, code):
+        """Проверка кода подтверждения для админки"""
+        if not username:
+            return False
+        
+        if username not in self.pending_admin_logins:
+            logger.error(f"Нет ожидающих вход запросов для админки {username}")
+            return False
+        
+        login_data = self.pending_admin_logins[username]
+        
+        if datetime.now() > login_data['expires']:
+            del self.pending_admin_logins[username]
+            logger.error(f"Код истек для админки {username}")
+            return False
+        
+        if login_data['attempts'] >= 3:
+            del self.pending_admin_logins[username]
+            logger.error(f"Превышено количество попыток для админки {username}")
+            return False
+        
+        login_data['attempts'] += 1
+        
+        if login_data['code'] == code:
+            del self.pending_admin_logins[username]
+            logger.info(f"Успешная аутентификация админки для {username}")
+            return True
+        
+        logger.warning(f"Неверный код для админки {username}. Попытка {login_data['attempts']}")
+        return False
+    
+    def authenticate_test_user(self, username, use_domain_auth=False):
+        """Аутентификация пользователя для тестирования"""
+        settings = self.get_settings()
+        
+        if use_domain_auth:
+            if not username or '@' not in username:
+                logger.error(f"Неверный формат username: {username}")
+                return False
+            
+            login = username.split('@')[0].lower()
+            domain = username.split('@')[1].lower()
+            
+            expected_domain = settings["domain_name"]
+            if domain != expected_domain:
+                logger.error(f"Неверный домен: {domain}, ожидается: {expected_domain}")
+                return False
+            
+            logger.info(f"Доменная аутентификация успешна для {login}")
+            return self._create_user_info(login, username, f"{login} ({domain})")
+        else:
+            if not username or len(username.strip()) < 2:
+                logger.error(f"Неверное ФИО: {username}")
+                return False
+            
+            logger.info(f"Аутентификация по ФИО успешна для {username}")
+            return self._create_user_info(username, "", username)
+    
+    def _create_user_info(self, username, email, display_name):
+        user_info = {
+            "username": username,
+            "email": email,
+            "display_name": display_name
+        }
+        logger.debug(f"Информация о пользователе: {user_info}")
         return user_info
     
     def create_session_token(self, username):
-        """Создает сессионный токен на основе имени пользователя и времени"""
         timestamp = str(int(time.time()))
         token_data = f"{username}:{timestamp}:{Config.APP_SECRET}"
         session_token = hashlib.sha256(token_data.encode()).hexdigest()
-        logger.debug(f"Создан сессионный токен для пользователя: {username}")
+        logger.debug(f"Создан сессионный токен для: {username}")
         return session_token
     
     def validate_session_token(self, session_token, username):
-        """Проверяет валидность сессионного токена"""
         try:
-            # Токен действителен в течение 24 часов
             current_time = int(time.time())
             valid_tokens = []
             
-            # Генерируем токены за последние 24 часа
-            for i in range(0, 86400, 3600):  # Каждый час в течение 24 часов
+            for i in range(0, 86400, 3600):
                 timestamp = str(current_time - i)
                 token_data = f"{username}:{timestamp}:{Config.APP_SECRET}"
                 valid_tokens.append(hashlib.sha256(token_data.encode()).hexdigest())
             
             return session_token in valid_tokens
-            
         except Exception as e:
-            logger.error(f"Ошибка валидации токена: {str(e)}")
+            logger.error(f"Ошибка валидации токена: {e}")
             return False

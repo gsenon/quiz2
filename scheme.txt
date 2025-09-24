@@ -1,24 +1,26 @@
-oprosnik_web/
-├── app.py                      # Основное Flask приложение
-├── config.py                   # Конфигурация приложения
-├── auth.py                     # Доменная авторизация
-├── email_sender.py             # Отправка email
-├── pdf_generator.py            # Генерация PDF
-├── DejaVuSans.ttf              # Шрифт для PDF
-├── quiz_data.json              # База вопросов
-├── settings.json               # Настройки приложения
-├── question_generator.py       # Генератор вопросов
-├── requirements.txt            # Зависимости
-├── static/
-│   └── style.css              # Стили
-└── templates/
-    ├── base.html              # Базовый шаблон
-    ├── index.html             # Главная страница
-    ├── quiz.html              # Страница вопроса
-    ├── results.html           # Результаты теста
-    └── admin/
-        ├── login.html         # Вход в админку
-        ├── dashboard.html     # Панель управления
-        ├── add_edit.html      # Добавление/редактирование вопросов
-        ├── settings.html      # Настройки домена и почты
-        └── domain_users.html  # Управление пользователями
+Нужные файлы:
+├── app.py                 # Главное приложение
+├── auth.py               # Система аутентификации
+├── config.py             # Конфигурация
+├── email_sender.py       # Отправка email
+├── pdf_generator.py      # Генерация PDF
+├── question_generator.py # Генератор вопросов
+├── requirements.txt      # Зависимости
+├── Dockerfile           # Докер образ
+├── DejaVuSans.ttf       # Шрифт для PDF
+│
+├── templates/
+│   ├── base.html        # Базовый шаблон
+│   ├── index.html       # Главная страница
+│   ├── quiz.html        # Страница вопроса
+│   ├── results.html     # Результаты
+│   └── admin/
+│       ├── login.html       # Вход в админку
+│       ├── enter_code.html  # Ввод кода админки
+│       ├── dashboard.html   # Панель админки
+│       ├── settings.html    # Настройки
+│       └── add_edit.html    # Редактирование вопросов 
+│
+└── Статические файлы (JSON):
+    ├── quiz_data.json    # База вопросов (
+    └── settings.json     # Настройки 
