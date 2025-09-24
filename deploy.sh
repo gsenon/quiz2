@@ -1,46 +1,85 @@
 #!/bin/bash
 set -e
 
-APP_NAME="quiz-app"
+# =========================
+# Двухрежимный deploy.sh (вариант 2)
+# =========================
+
+MODE=""
+MODE_NAME=""
 IMAGE_NAME="quiz-app:latest"
-MINIKUBE_MEMORY=4096
-MINIKUBE_CPUS=2
-K8S_DIR="k8s"
 
-echo "=== 1. Проверка Minikube и Docker ==="
-if ! command -v minikube &> /dev/null; then
-    echo "❌ Minikube не установлен!"
+# --- Выбор режима ---
+echo "=== Выберите режим запуска ==="
+echo "1) minikube"
+echo "2) production"
+read -p "Введите 1 или 2: " MODE
+if [[ "$MODE" == "1" ]]; then
+    MODE_NAME="minikube"
+elif [[ "$MODE" == "2" ]]; then
+    MODE_NAME="production"
+else
+    echo "Некорректный выбор. Выходим."
     exit 1
 fi
+echo "=== Выбран режим: $MODE_NAME ==="
 
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker не установлен!"
-    exit 1
+# --- Проверка Docker и kubectl ---
+echo "=== 1. Проверка Docker и kubectl ==="
+docker version
+kubectl version --client
+
+# ====================
+# Блок для Minikube
+# ====================
+if [[ "$MODE_NAME" == "minikube" ]]; then
+    echo "=== 2. Проверка Minikube и загрузка образа ==="
+    
+    # Сборка локального Docker-образа
+    echo "=== 3. Сборка Docker-образа ==="
+    docker build -t $IMAGE_NAME .
+
+    # Загрузка образа напрямую в Minikube
+    echo "=== 4. Загрузка образа в Minikube ==="
+    minikube image load $IMAGE_NAME
+
+    # Применение Kubernetes ресурсов
+    echo "=== 5. Применение ConfigMap ==="
+    kubectl apply -f k8s/configmap.yaml
+
+    echo "=== 6. Создание/обновление Deployment ==="
+    kubectl apply -f k8s/minikube-deployment.yaml
+
+    echo "=== 7. Применение Service ==="
+    kubectl apply -f k8s/minikube-service.yaml
+
+# ====================
+# Блок для Production
+# ====================
+else
+    echo "=== 2. Сборка Docker-образа для Production ==="
+    docker build -t $IMAGE_NAME .
+
+    echo "=== 3. Пуш Docker-образа в registry для Production ==="
+    # Настройте ваш Production registry:
+    # docker tag $IMAGE_NAME myregistry/quiz-app:latest
+    # docker push myregistry/quiz-app:latest
+
+    echo "=== 4. Применение Kubernetes ресурсов (Production) ==="
+    kubectl apply -f k8s/secret.yaml
+    kubectl apply -f k8s/configmap.yaml
+    kubectl apply -f k8s/production-deployment.yaml
+    kubectl apply -f k8s/production-service.yaml
+    kubectl apply -f k8s/production-ingress.yaml
 fi
 
-echo "=== 2. Запуск Minikube ==="
-minikube start --memory=$MINIKUBE_MEMORY --cpus=$MINIKUBE_CPUS --driver=docker
-eval $(minikube docker-env)
+# --- Перезапуск деплоймента ---
+echo "=== 8. Перезапуск деплоймента ($MODE_NAME) ==="
+kubectl rollout restart deployment/quiz || true
 
-echo "=== 3. Сборка Docker-образа ==="
-docker build -t $IMAGE_NAME .
-
-echo "=== 4. Деплой Postgres ==="
-kubectl apply -f $K8S_DIR/postgres-secret.yaml
-kubectl apply -f $K8S_DIR/postgres-pvc.yaml
-kubectl apply -f $K8S_DIR/postgres-deployment.yaml
-kubectl apply -f $K8S_DIR/postgres-service.yaml
-
-echo "=== 5. Деплой Quiz App ==="
-kubectl apply -f $K8S_DIR/configmap.yaml
-kubectl apply -f $K8S_DIR/secret-example.yaml
-kubectl apply -f $K8S_DIR/deployment-minikube.yaml
-kubectl apply -f $K8S_DIR/service.yaml
-
-echo "=== 6. Проверка состояния Pod'ов ==="
+# --- Проверка статуса подов и сервисов ---
+echo "=== 9. Проверка состояния подов и сервисов ==="
 kubectl get pods
+kubectl get svc
 
-echo "=== 7. Открываем сервис в браузере ==="
-minikube service $APP_NAME
-
-echo "✅ Развёртывание завершено!"
+echo "=== Деплой завершён успешно! ==="

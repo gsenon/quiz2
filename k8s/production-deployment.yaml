@@ -5,15 +5,10 @@ metadata:
   labels:
     app: quiz
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: quiz
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   template:
     metadata:
       labels:
@@ -21,7 +16,7 @@ spec:
     spec:
       containers:
       - name: quiz
-        image: yourregistry/quiz-rambler-app:1.0.0
+        image: myregistry/quiz-app:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -30,22 +25,15 @@ spec:
             name: quiz-config
         - secretRef:
             name: quiz-secret
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
-          limits:
-            cpu: "500m"
-            memory: "512Mi"
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 20
+          initialDelaySeconds: 10
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /healthz
             port: 8080
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 5

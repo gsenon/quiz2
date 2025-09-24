@@ -3,4 +3,6 @@ kind: ConfigMap
 metadata:
   name: quiz-config
 data:
-  APP_ENV: "production"
+  APP_ENV: "development"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"

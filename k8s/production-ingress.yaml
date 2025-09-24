@@ -3,13 +3,8 @@ kind: Ingress
 metadata:
   name: quiz-ingress
   annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
-  tls:
-  - hosts:
-    - quiz.example.com
-    secretName: quiz-tls
   rules:
   - host: quiz.example.com
     http:
@@ -18,6 +13,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: quiz
+            name: quiz-service
             port:
-              number: 80
+              number: 8080
