@@ -20,23 +20,19 @@
     <div class="thead">
       <div>Статус</div><div>Вопрос</div><div>Ваш ответ</div>
     </div>
-    {% for r in rows %}
+    {% for result in results_data %}  <!-- Исправлено: results_data вместо rows -->
       <div class="trow">
-        <div>{{ r.status }}</div>
-        <div>{{ r.q.question }}</div>
+        <div>{{ result.status }}</div>
+        <div>{{ result.question.question_text[:100] }}...</div>  <!-- Исправлено: question_text -->
         <div class="ua">
-          {% if r.q.type in ['single_choice'] %}
-            {{ r.ua or '—' }}
-          {% elif r.q.type == 'multiple_choice' %}
-            {{ r.ua|join(', ') if r.ua else '—' }}
-          {% elif r.q.type in ['fill_blank','open_question'] %}
-            {{ r.ua or '—' }}
-          {% elif r.q.type == 'matching' %}
-            {% if r.ua %}
-              {% for k,v in r.ua.items() %}
-                <div>{{ k }} → {{ v }}</div>
-              {% endfor %}
-            {% else %}—{% endif %}
+          {% if result.question.question_type in ['single_choice'] %}
+            {{ result.user_answer or '—' }}
+          {% elif result.question.question_type == 'multiple_choice' %}
+            {{ result.user_answer|join(', ') if result.user_answer else '—' }}
+          {% elif result.question.question_type in ['fill_blank','open_question'] %}
+            {{ result.user_answer or '—' }}
+          {% else %}
+            {{ result.user_answer or '—' }}
           {% endif %}
         </div>
       </div>

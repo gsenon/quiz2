@@ -1,10 +1,10 @@
-# auth.py - authentication helpers for Quiz app
+# auth.py - authentication helpers for Quiz app (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 import logging
 import random
 import string
 from datetime import datetime, timedelta
 from config import Config
-from models import Setting
+from models import Setting, db  # Добавлен импорт db
 import json
 
 logging.basicConfig(level=logging.INFO)

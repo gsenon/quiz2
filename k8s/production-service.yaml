@@ -3,10 +3,9 @@ kind: Service
 metadata:
   name: quiz-service
 spec:
+  type: ClusterIP
   selector:
     app: quiz
-  type: ClusterIP
   ports:
-    - protocol: TCP
-      port: 8080
+    - port: 8080
       targetPort: 8080

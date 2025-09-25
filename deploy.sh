@@ -1,97 +1,75 @@
 #!/bin/bash
 set -e
 
-# =========================
-# Двухрежимный deploy.sh (аргумент + интерактив)
-# =========================
+echo "=== Выберите режим запуска ==="
+echo "1) minikube"
+echo "2) production"
+read -rp "Введите 1 или 2: " CHOICE
 
-MODE="$1"   # можно передать "minikube" или "production"
-
-if [[ -z "$MODE" ]]; then
-    echo "=== Выберите режим запуска ==="
-    echo "1) minikube"
-    echo "2) production"
-    read -p "Введите 1 или 2: " CHOICE
-    if [[ "$CHOICE" == "1" ]]; then
-        MODE="minikube"
-    elif [[ "$CHOICE" == "2" ]]; then
-        MODE="production"
-    else
-        echo "Некорректный выбор. Выходим."
-        exit 1
-    fi
-fi
-
-if [[ "$MODE" != "minikube" && "$MODE" != "production" ]]; then
-    echo "Использование: $0 [minikube|production]"
+if [[ "$CHOICE" == "1" ]]; then
+    MODE="minikube"
+elif [[ "$CHOICE" == "2" ]]; then
+    MODE="production"
+else
+    echo "Неверный выбор"
     exit 1
 fi
 
 echo "=== Выбран режим: $MODE ==="
 
-# --- Проверка Docker и kubectl ---
+# 1. Проверка Docker и kubectl
 echo "=== 1. Проверка Docker и kubectl ==="
 docker version
 kubectl version --client
 
-IMAGE_NAME="quiz-app:latest"
+# 2. PostgreSQL
+echo "=== 2. Развёртывание PostgreSQL ==="
+kubectl create namespace quiz-db || true
+kubectl apply -f k8s/postgres-deployment.yaml -n quiz-db
+kubectl apply -f k8s/postgres-service.yaml -n quiz-db
 
+# 3. Сборка Docker-образа
+echo "=== 3. Сборка Docker-образа ==="
+docker build -t quiz-app .
+
+# 4. Загрузка образа в Minikube (только minikube)
 if [[ "$MODE" == "minikube" ]]; then
-    echo "=== 2. Проверка Minikube и загрузка образа ==="
-    if ! minikube status >/dev/null 2>&1; then
-        echo "Minikube не запущен. Запустите: minikube start"
-        exit 1
-    fi
-
-    echo "=== 3. Сборка Docker-образа ==="
-    docker build -t $IMAGE_NAME .
-
     echo "=== 4. Загрузка образа в Minikube ==="
-    minikube image load $IMAGE_NAME
-
-    echo "=== 5. Применение ConfigMap ==="
-    kubectl apply -f k8s/configmap.yaml
-
-    echo "=== 6. Создание/обновление Deployment ==="
-    kubectl apply -f k8s/minikube-deployment.yaml
-
-    echo "=== 7. Применение Service ==="
-    kubectl apply -f k8s/minikube-service.yaml
-
-elif [[ "$MODE" == "production" ]]; then
-    echo "=== 2. Сборка Docker-образа для Production ==="
-    docker build -t $IMAGE_NAME .
-
-    echo "=== 3. Пуш Docker-образа в registry (Production) ==="
-    # Здесь укажите ваш реестр
-    # docker tag $IMAGE_NAME myregistry/quiz-app:latest
-    # docker push myregistry/quiz-app:latest
-
-    echo "=== 4. Применение Kubernetes ресурсов (Production) ==="
-    kubectl apply -f k8s/secret.yaml
-    kubectl apply -f k8s/configmap.yaml
-    kubectl apply -f k8s/production-deployment.yaml
-    kubectl apply -f k8s/production-service.yaml
-    kubectl apply -f k8s/production-ingress.yaml
+    minikube image load quiz-app
 fi
 
-echo "=== 8. Перезапуск деплоймента ($MODE) ==="
-kubectl rollout restart deployment/quiz || true
+# 5. Применение ConfigMap
+echo "=== 5. Применение ConfigMap ==="
+kubectl apply -f k8s/configmap.yaml
 
-echo "=== 9. Проверка состояния подов и сервисов ==="
+# 6. Создание/обновление Deployment
+echo "=== 6. Создание/обновление Deployment ==="
+if [[ "$MODE" == "minikube" ]]; then
+    kubectl apply -f k8s/minikube-deployment.yaml
+    kubectl apply -f k8s/minikube-service.yaml
+else
+    kubectl apply -f k8s/production-deployment.yaml
+    kubectl apply -f k8s/production-service.yaml
+fi
+
+# 7. Перезапуск деплоймента
+echo "=== 7. Перезапуск деплоймента ==="
+kubectl rollout restart deployment quiz
+
+# 8. Проверка состояния
+echo "=== 8. Проверка состояния подов и сервисов ==="
 kubectl get pods
 kubectl get svc
 
-# --- Автооткрытие веб-интерфейса ---
+# 9. Открытие веб-интерфейса
+echo "=== 9. Открытие веб-интерфейса ==="
 if [[ "$MODE" == "minikube" ]]; then
     IP=$(minikube ip)
     PORT=$(kubectl get svc quiz-service -o jsonpath='{.spec.ports[0].nodePort}')
     URL="http://$IP:$PORT"
-elif [[ "$MODE" == "production" ]]; then
-    URL="http://example.com" # заменить на реальный домен
+else
+    URL="http://example.com" # замените на свой домен
 fi
 
-echo "Открываем веб-интерфейс по адресу: $URL"
-xdg-open "$URL" 2>/dev/null || open "$URL" 2>/dev/null || true
-
-echo "=== Деплой завершён успешно! ==="
+echo "Веб-интерфейс доступен по адресу: $URL"
+xdg-open $URL 2>/dev/null || open $URL

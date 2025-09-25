@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: quiz
-  labels:
-    app: quiz
 spec:
   replicas: 2
   selector:
@@ -15,25 +13,10 @@ spec:
         app: quiz
     spec:
       containers:
-      - name: quiz
+      - name: quiz-app
         image: quiz-app:latest
-        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         envFrom:
         - configMapRef:
             name: quiz-config
-        - secretRef:
-            name: quiz-db-secret
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5

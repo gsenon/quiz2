@@ -1,4 +1,4 @@
-# app.py - Flask 3.x, продакшен-ready
+# app.py - Flask 3.x с PostgreSQL и ролевой моделью (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 import os
 import json
 import random
@@ -6,19 +6,17 @@ import logging
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from config import Config
-from models import db, Setting, Question, TestSession
-from auth import AuthSystem
+from sqlalchemy.exc import SQLAlchemyError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
+app.secret_key = os.environ.get("APP_SECRET") or "dev-secret-key"
 
-# Secret key
-app.secret_key = os.environ.get("APP_SECRET") or Config.APP_SECRET_DEFAULT
-
-# Database URL
+# -------------------
+# Database configuration
+# -------------------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     pg_user = os.environ.get("DB_USER")
@@ -27,19 +25,46 @@ if not DATABASE_URL:
     pg_port = os.environ.get("DB_PORT")
     pg_name = os.environ.get("DB_NAME")
     if pg_user and pg_pass and pg_host and pg_port and pg_name:
-        DATABASE_URL = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_name}"
+        DATABASE_URL = f"postgresql+psycopg2://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_name}"
     else:
         DATABASE_URL = "sqlite:///quiz_dev.db"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
+db = SQLAlchemy(app)
+
+# -------------------
+# Models (импортируем из models.py)
+# -------------------
+from models import Admin, Setting, Question, TestSession
+
+# -------------------
+# Auth system (demo)
+# -------------------
+class AuthSystem:
+    def __init__(self):
+        self.admin_codes = {}
+
+    def initiate_admin_login(self, username):
+        import random, string
+        code = ''.join(random.choices(string.digits, k=6))
+        self.admin_codes[username] = code
+        return code
+
+    def verify_admin_code(self, username, code):
+        return self.admin_codes.get(username) == code
+
+    def authenticate_test_user(self, username, use_domain_auth=False):
+        if not username:
+            return None
+        return {'username': username, 'display_name': username}
 
 auth_system = AuthSystem()
 
 # -------------------
 # Jinja filters
 # -------------------
+@app.template_filter('shuffle')
 def shuffle_filter(seq):
     try:
         result = list(seq)
@@ -48,7 +73,47 @@ def shuffle_filter(seq):
     except Exception:
         return seq
 
-app.jinja_env.filters['shuffle'] = shuffle_filter
+# -------------------
+# Helpers (УДАЛЕНО ДУБЛИРОВАНИЕ)
+# -------------------
+def get_settings():
+    try:
+        settings = {}
+        for s in Setting.query.all():
+            try:
+                settings[s.key] = json.loads(s.value)
+            except Exception:
+                settings[s.key] = s.value
+        return settings
+    except Exception as e:
+        logger.error(f"Error loading settings: {e}")
+        return {'auth': {'domain_auth_enabled': False, 'domain_name': 'company.ru'}, 
+                'email': {'enabled': False, 'smtp_server': '', 'smtp_port': 587, 'from_email': 'noreply@company.ru'}}
+
+def get_questions_pool():
+    try:
+        return Question.query.filter_by(is_active=True).all()
+    except Exception as e:
+        logger.error(f"Error loading questions: {e}")
+        return []
+
+def init_db():
+    with app.app_context():
+        try:
+            db.create_all()
+            # default settings
+            default_settings = {
+                'auth': {'domain_auth_enabled': False, 'domain_name': 'company.ru'},
+                'email': {'enabled': False, 'smtp_server': '', 'smtp_port': 587, 'from_email': 'noreply@company.ru'}
+            }
+            for key, value in default_settings.items():
+                if not Setting.query.filter_by(key=key).first():
+                    db.session.add(Setting(key=key, value=json.dumps(value, ensure_ascii=False)))
+            db.session.commit()
+            logger.info('✅ DB initialized')
+        except Exception as e:
+            logger.error(f'Error initializing DB: {e}')
+            db.session.rollback()
 
 # -------------------
 # Routes
@@ -64,7 +129,7 @@ def healthz():
         db.session.execute('SELECT 1')
         db_status = 'healthy'
     except Exception as e:
-        db_status = f'unhealthy: {str(e)}'
+        db_status = f'unhealthy: {e}'
     return jsonify({'status': 'ok', 'database': db_status, 'timestamp': datetime.utcnow().isoformat()})
 
 @app.route('/start_test', methods=['POST'])
@@ -86,11 +151,7 @@ def start_test():
     pool = get_questions_pool()
     count = min(50, len(pool))
     selected = random.sample(pool, count) if pool else []
-    session.update({
-        'quiz_questions': [q.id for q in selected],
-        'quiz_idx': 0,
-        'answers': {}
-    })
+    session.update({'quiz_questions':[q.id for q in selected], 'quiz_idx':0, 'answers':{}})
     return redirect(url_for('quiz'))
 
 @app.route('/quiz', methods=['GET','POST'])
@@ -164,7 +225,13 @@ def results():
             is_correct = user_answers == correct_answers
         if is_correct:
             score += weight
-        results_data.append({'question': question, 'user_answer': user_answer, 'is_correct': is_correct, 'weight': weight})
+        results_data.append({
+            'question': question, 
+            'user_answer': user_answer, 
+            'is_correct': is_correct, 
+            'weight': weight,
+            'status': '✅' if is_correct else '❌'
+        })
     percent = round((score / total_weight * 100), 2) if total_weight > 0 else 0
     level = 'L2' if percent >= 80 else 'L1'
     try:
@@ -182,15 +249,16 @@ def results():
     except Exception as e:
         logger.error(f'Error saving results: {e}')
         db.session.rollback()
-    return render_template('results.html', results=results_data, percent=percent, level=level, score=score, total_weight=total_weight)
+    return render_template('results.html', results_data=results_data, percent=percent, level=level, score=score, total_weight=total_weight)
 
 # -------------------
-# Admin routes
+# Admin routes (ИСПРАВЛЕНЫ МАРШРУТЫ)
 # -------------------
 @app.route('/admin/login', methods=['GET','POST'])
 def admin_login():
     if request.method == 'POST':
         username = request.form.get('username','').strip().lower()
+        from config import Config
         if not Config.is_super_user(username):
             flash('Access denied', 'error')
             return redirect(url_for('admin_login'))
@@ -227,11 +295,9 @@ def admin_dashboard():
         'active_questions': Question.query.filter_by(is_active=True).count(),
         'total_sessions': TestSession.query.count()
     }
-    return render_template('admin/dashboard.html', stats=stats)
+    questions = Question.query.all()
+    return render_template('admin/dashboard.html', stats=stats, questions=questions, today=datetime.now().strftime('%Y-%m-%d'))
 
-# -------------------
-# Settings helpers
-# -------------------
 @app.route('/admin/settings', methods=['GET','POST'])
 def admin_settings():
     if not session.get('is_admin'):
@@ -239,8 +305,19 @@ def admin_settings():
     if request.method == 'POST':
         try:
             settings = {
-                'auth': {'domain_auth_enabled': request.form.get('domain_auth_enabled') == 'on', 'domain_name': request.form.get('domain_name','company.ru')},
-                'email': {'enabled': request.form.get('email_enabled') == 'on', 'smtp_server': request.form.get('smtp_server',''), 'smtp_port': int(request.form.get('smtp_port', '587')), 'from_email': request.form.get('from_email','')}
+                'auth': {
+                    'domain_auth_enabled': request.form.get('domain_auth_enabled') == 'on', 
+                    'domain_name': request.form.get('domain_name','company.ru')
+                },
+                'email': {
+                    'enabled': request.form.get('email_enabled') == 'on', 
+                    'smtp_server': request.form.get('smtp_server',''), 
+                    'smtp_port': int(request.form.get('smtp_port', '587')), 
+                    'from_email': request.form.get('from_email',''),
+                    'admin_emails': [e.strip() for e in request.form.get('admin_emails', '').split(',') if e.strip()],
+                    'subject': request.form.get('email_subject', 'Результаты тестирования'),
+                    'code_subject': request.form.get('code_subject', 'Код доступа админки')
+                }
             }
             for key, value in settings.items():
                 setting = Setting.query.filter_by(key=key).first()
@@ -263,44 +340,6 @@ def admin_sessions():
         return redirect(url_for('admin_login'))
     sessions = TestSession.query.order_by(TestSession.completed_at.desc()).limit(50).all()
     return render_template('admin/sessions.html', sessions=sessions)
-
-# -------------------
-# Helpers
-# -------------------
-def get_settings():
-    try:
-        settings = {}
-        for s in Setting.query.all():
-            try:
-                settings[s.key] = json.loads(s.value)
-            except Exception:
-                settings[s.key] = s.value
-        return settings
-    except Exception as e:
-        logger.error(f'Error loading settings: {e}')
-        return {'auth': {'domain_auth_enabled': False, 'domain_name': 'company.ru'}, 'email': {'enabled': False}}
-
-def get_questions_pool():
-    try:
-        return Question.query.filter_by(is_active=True).all()
-    except Exception as e:
-        logger.error(f'Error loading questions: {e}')
-        return []
-
-def init_db():
-    with app.app_context():
-        try:
-            db.create_all()
-            # default settings
-            default_settings = {'auth': {'domain_auth_enabled': False, 'domain_name': 'company.ru'}, 'email': {'enabled': False, 'smtp_server': '', 'smtp_port': 587, 'from_email': 'noreply@company.ru'}}
-            for key, value in default_settings.items():
-                if not Setting.query.filter_by(key=key).first():
-                    db.session.add(Setting(key=key, value=json.dumps(value, ensure_ascii=False)))
-            db.session.commit()
-            logger.info('✅ DB initialized')
-        except Exception as e:
-            logger.error(f'Error initializing DB: {e}')
-            db.session.rollback()
 
 # -------------------
 # Запуск

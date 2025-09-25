@@ -3,9 +3,6 @@ kind: ConfigMap
 metadata:
   name: quiz-config
 data:
-  APP_MODE: "production"           # Режим работы приложения
-  QUIZ_DB_HOST: "quiz-db"          # Хост базы данных
-  QUIZ_DB_PORT: "5432"
-  QUIZ_DB_NAME: "quiz_db"
-  QUIZ_DB_USER: "quiz_user"
-  QUIZ_MAX_USERS: "100"            # Максимальное количество одновременных пользователей
+  DATABASE_URL: "postgresql+psycopg2://quiz_user:$(DB_PASSWORD)@quiz-postgres:5432/quiz_db"
+  APP_SECRET: "your-secret-key-change-in-production"
+  SUPER_USERS: "k.skachilov"

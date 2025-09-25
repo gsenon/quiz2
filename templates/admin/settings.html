@@ -4,7 +4,7 @@
 <section class="card">
     <h1>Настройки системы</h1>
     
-    <form method="post" action="{{ url_for('admin_settings_post') }}">
+    <form method="post" action="{{ url_for('admin_settings') }}">  <!-- Исправлен action -->
         <h2>Настройки аутентификации</h2>
         
         <div class="form-group">
@@ -52,7 +52,7 @@
         <div class="form-group">
             <label for="smtp_password">SMTP пароль:</label>
             <input type="password" id="smtp_password" name="smtp_password" 
-                   value="{{ settings.email.smtp_password }}">
+                   value="{{ settings.email.smtp_password or '' }}">
         </div>
         
         <div class="form-group">
@@ -64,19 +64,19 @@
         <div class="form-group">
             <label for="admin_emails">Email администраторов (через запятую):</label>
             <input type="text" id="admin_emails" name="admin_emails" 
-                   value="{{ settings.email.admin_emails | join(',') }}">
+                   value="{{ settings.email.admin_emails | join(',') if settings.email.admin_emails }}">
         </div>
         
         <div class="form-group">
             <label for="email_subject">Тема письма с результатами:</label>
             <input type="text" id="email_subject" name="email_subject" 
-                   value="{{ settings.email.subject }}">
+                   value="{{ settings.email.subject or 'Результаты тестирования' }}">
         </div>
         
         <div class="form-group">
             <label for="code_subject">Тема письма с кодом админки:</label>
             <input type="text" id="code_subject" name="code_subject" 
-                   value="{{ settings.email.code_subject }}">
+                   value="{{ settings.email.code_subject or 'Код доступа админки' }}">
         </div>
         
         <button type="submit" class="btn">Сохранить настройки</button>
