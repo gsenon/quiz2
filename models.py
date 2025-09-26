@@ -1,10 +1,9 @@
+# models.py - независимые модели БД
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, JSON
-import os  # Добавлен недостающий импорт
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
+import os
 
-db = SQLAlchemy()
 Base = declarative_base()
 
 class Admin(Base):
@@ -47,5 +46,6 @@ class TestSession(Base):
     level = Column(String(10))
     completed_at = Column(DateTime, default=datetime.utcnow)
 
-# Engine для Base.metadata.create_all
-engine = create_engine(os.environ.get("DATABASE_URL") or "sqlite:///quiz_dev.db")
+# Функция для инициализации БД
+def init_db(engine):
+    Base.metadata.create_all(bind=engine)
