@@ -12,6 +12,35 @@ spec:
       labels:
         app: quiz
     spec:
+      initContainers:
+        - name: init-db
+          image: quiz-app:latest
+          command: ['sh', '-c', 'sleep 30 && python manage.py init_db']
+          env:
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_NAME
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: APP_SECRET
       containers:
         - name: quiz
           image: quiz-app:latest
@@ -58,4 +87,22 @@ spec:
                 secretKeyRef:
                   name: quiz-secrets
                   key: LDAP_BIND_PASSWORD
-      restartPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

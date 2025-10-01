@@ -33,9 +33,32 @@ spec:
                 configMapKeyRef:
                   name: quiz-config
                   key: DB_NAME
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - mountPath: /var/lib/postgresql/data
               name: postgres-data
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - quizuser
+                - -d
+                - quizdb
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - quizuser
+                - -d
+                - quizdb
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
         - name: postgres-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: postgres-pvc

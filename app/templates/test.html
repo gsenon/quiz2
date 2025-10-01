@@ -5,12 +5,306 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Тестирование - Вопрос {{ question_num }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .test-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        
+        .test-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .test-title {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        
+        .question-counter {
+            font-size: 1.2em;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .progress-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .progress-text {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .progress-percent {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e9ecef;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+        
+        .question-element {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .question-badge {
+            background: #007bff;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+        
+        .question-level {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        
+        .question-text {
+            color: #2c3e50;
+            font-size: 1.3em;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        
+        .question-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .options-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+        }
+        
+        .option-item {
+            margin-bottom: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .option-item:hover {
+            border-color: #007bff;
+            background: #f8f9fa;
+        }
+        
+        .option-item.selected {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+        
+        .option-label {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .option-input {
+            margin-right: 15px;
+            transform: scale(1.2);
+        }
+        
+        .option-marker {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #6c757d;
+            border-radius: 50%;
+            margin-right: 15px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        input[type="radio"]:checked + .option-marker {
+            border-color: #28a745;
+            background: #28a745;
+        }
+        
+        input[type="radio"]:checked + .option-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+        }
+        
+        .option-text {
+            font-size: 1.1em;
+            color: #495057;
+            line-height: 1.4;
+        }
+        
+        .navigation-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navigation-buttons {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .nav-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-prev {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-prev:hover {
+            background: #5a6268;
+        }
+        
+        .btn-next {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-next:hover {
+            background: #0056b3;
+        }
+        
+        .btn-finish {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-finish:hover {
+            background: #218838;
+        }
+        
+        .nav-btn-placeholder {
+            width: 100px;
+        }
+        
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .info-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .timer-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #dc3545;
+        }
+        
+        .progress-stats {
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .test-container {
+                padding: 10px;
+            }
+            
+            .question-header,
+            .question-meta,
+            .navigation-buttons,
+            .info-panel {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .nav-btn {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container test-container" 
+    <div class="test-container" 
          data-question-num="{{ question_num }}" 
          data-total-questions="{{ total_questions }}" 
-         data-question-type="{{ question.type }}">
+         data-question-type="{{ question.get('type', 'single_choice') }}">
         
         <!-- Заголовок теста -->
         <div class="test-header">
@@ -39,7 +333,7 @@
             
             <div class="question-meta">
                 <span class="question-type">
-                    {% if question.type == 'single_choice' %}
+                    {% if question.get('type') == 'single_choice' %}
                         Выберите один правильный вариант
                     {% else %}
                         Выберите один или несколько правильных вариантов
@@ -55,7 +349,7 @@
                 {% for option in question.options %}
                 <div class="option-item" data-value="{{ option }}">
                     <label class="option-label">
-                        {% if question.type == 'single_choice' %}
+                        {% if question.get('type') == 'single_choice' %}
                             <input type="radio" name="answer" value="{{ option }}" class="option-input" required>
                         {% else %}
                             <input type="checkbox" name="answer" value="{{ option }}" class="option-input">
@@ -83,7 +377,7 @@
                     {% if question_num == total_questions %} 
                         Завершить тест
                     {% else %}
-                        Следующий вопрос
+                        Следующий вопрос →
                     {% endif %}
                 </button>
             </div>
@@ -103,7 +397,7 @@
                     <span>📊 Прогресс:</span>
                 </div>
                 <div class="progress-stats">
-                    <span>{{ question_num - 1 }}</span> / <span>{{ total_questions }}</span>
+                    <span id="completedQuestions">{{ question_num - 1 }}</span> / <span>{{ total_questions }}</span>
                 </div>
             </div>
         </div>
