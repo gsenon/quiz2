@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Ввод кода админки{% endblock %}
+{% block content %}
+<section class="card">
+    <h1>Ввод кода подтверждения</h1>
+    
+    <p>На корпоративную почту пользователя <strong>{{ session.pending_admin }}</strong> отправлен код доступа.</p>
+    <p>Введите код из письма для входа в админку.</p>
+    
+    <form method="post" action="{{ url_for('admin_verify_code') }}">
+        <div class="form-group">
+            <label for="code">Код доступа:</label>
+            <input type="text" id="code" name="code" required maxlength="6" 
+                   placeholder="Введите 6-значный код" autocomplete="off">
+        </div>
+        
+        <button type="submit" class="btn">Войти в админку</button>
+    </form>
+    
+    <p><small>Код действителен в течение 10 минут</small></p>
+</section>
+{% endblock %}

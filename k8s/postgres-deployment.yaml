@@ -1,33 +1,41 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: quiz-postgres
-  namespace: quiz-db
+  name: postgres
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: quiz-postgres
+      app: postgres
   template:
     metadata:
       labels:
-        app: quiz-postgres
+        app: postgres
     spec:
       containers:
-      - name: postgres
-        image: postgres:15
-        env:
-        - name: POSTGRES_DB
-          value: "quiz_db"
-        - name: POSTGRES_USER
-          value: "quiz_user"
-        - name: POSTGRES_PASSWORD
-          value: "quiz_pass"
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: postgres-data
-          mountPath: /var/lib/postgresql/data
+        - name: postgres
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_NAME
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-data
       volumes:
-      - name: postgres-data
-        emptyDir: {}
+        - name: postgres-data
+          emptyDir: {}

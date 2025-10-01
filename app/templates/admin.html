@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Админ-панель Quiz System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Админ-панель Quiz System</h1>
+        <nav class="admin-nav">
+            <a href="/admin/questions">Управление вопросами</a>
+            <a href="/admin/settings">Настройки системы</a>
+            <a href="/admin/users">Управление пользователями</a>
+            <a href="/admin/generate">Генерация вопросов</a>
+            <a href="/admin/stats">Статистика</a>
+            <a href="/logout">Выйти</a>
+        </nav>
+        <div id="admin-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>

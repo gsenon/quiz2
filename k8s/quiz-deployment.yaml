@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quiz
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: quiz
+  template:
+    metadata:
+      labels:
+        app: quiz
+    spec:
+      containers:
+        - name: quiz
+          image: quiz-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: DB_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: DB_NAME
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: APP_SECRET
+            - name: LDAP_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: LDAP_URI
+            - name: LDAP_BASE_DN
+              valueFrom:
+                configMapKeyRef:
+                  name: quiz-config
+                  key: LDAP_BASE_DN
+            - name: LDAP_BIND_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: quiz-secrets
+                  key: LDAP_BIND_PASSWORD
+      restartPolicy: Always

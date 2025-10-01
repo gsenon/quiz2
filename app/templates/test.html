@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестирование - Вопрос {{ question_num }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container test-container" 
+         data-question-num="{{ question_num }}" 
+         data-total-questions="{{ total_questions }}" 
+         data-question-type="{{ question.type }}">
+        
+        <!-- Заголовок теста -->
+        <div class="test-header">
+            <h1 class="test-title">Система тестирования знаний</h1>
+            <div class="question-counter">Вопрос {{ question_num }} из {{ total_questions }}</div>
+        </div>
+
+        <!-- Прогресс-бар -->
+        <div class="progress-section">
+            <div class="progress-info">
+                <span class="progress-text">Прогресс прохождения</span>
+                <span class="progress-percent" id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <!-- Контейнер вопроса -->
+        <div class="question-element">
+            <div class="question-header">
+                <span class="question-badge">Вопрос {{ question_num }}</span>
+                <span class="question-level">Уровень: {{ question.get('level', 'L1') }}</span>
+            </div>
+            <h2 class="question-text">{{ question.question }}</h2>
+            
+            <div class="question-meta">
+                <span class="question-type">
+                    {% if question.type == 'single_choice' %}
+                        Выберите один правильный вариант
+                    {% else %}
+                        Выберите один или несколько правильных вариантов
+                    {% endif %}
+                </span>
+                <span class="question-weight">Вес вопроса: {{ question.get('weight', 1) }} балл</span>
+            </div>
+        </div>
+
+        <!-- Контейнер вариантов ответа -->
+        <div class="options-container">
+            <form method="POST" action="{{ url_for('process_answer') }}" id="testForm">
+                {% for option in question.options %}
+                <div class="option-item" data-value="{{ option }}">
+                    <label class="option-label">
+                        {% if question.type == 'single_choice' %}
+                            <input type="radio" name="answer" value="{{ option }}" class="option-input" required>
+                        {% else %}
+                            <input type="checkbox" name="answer" value="{{ option }}" class="option-input">
+                        {% endif %}
+                        <span class="option-marker"></span>
+                        <span class="option-text">{{ option }}</span>
+                    </label>
+                </div>
+                {% endfor %}
+            </form>
+        </div>
+
+        <!-- Навигационные кнопки -->
+        <div class="navigation-section">
+            <div class="navigation-buttons">
+                {% if question_num > 1 %}
+                <button type="button" class="nav-btn btn-prev" id="prevBtn">
+                    ← Назад
+                </button>
+                {% else %}
+                <div class="nav-btn-placeholder"></div>
+                {% endif %}
+                
+                <button type="submit" form="testForm" class="nav-btn {% if question_num == total_questions %}btn-finish{% else %}btn-next{% endif %}" id="submitBtn">
+                    {% if question_num == total_questions %} 
+                        Завершить тест
+                    {% else %}
+                        Следующий вопрос
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+
+        <!-- Панель информации -->
+        <div class="info-panel">
+            <div class="info-section timer-section">
+                <div class="info-label">
+                    <span>⏱️ Время:</span>
+                </div>
+                <div class="timer-display" id="timeCounter">00:00</div>
+            </div>
+            
+            <div class="info-section question-info">
+                <div class="info-label">
+                    <span>📊 Прогресс:</span>
+                </div>
+                <div class="progress-stats">
+                    <span>{{ question_num - 1 }}</span> / <span>{{ total_questions }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Внешний JavaScript файл -->
+    <script src="{{ url_for('static', filename='js/test.js') }}"></script>
+</body>
+</html>

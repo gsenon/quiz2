@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Результаты тестирования</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Результаты тестирования</h1>
+        
+        <div class="results-summary">
+            <h2>Поздравляем, {{ test_session.user_display_name }}!</h2>
+            <div class="score-card {% if percent >= 70 %}success{% else %}warning{% endif %}">
+                <h3>Ваш результат: {{ score }}/{{ total }} ({{ "%.1f"|format(percent) }}%)</h3>
+                <p>Уровень: {{ test_session.level }}</p>
+            </div>
+        </div>
+
+        <div class="results-actions">
+            <a href="{{ url_for('download_pdf', session_id=test_session.id) }}" class="btn">
+                📄 Скачать PDF отчет
+            </a>
+            <a href="/" class="btn">🏠 На главную</a>
+        </div>
+
+        <div class="detailed-results">
+            <h3>Детальные результаты:</h3>
+            {% for i in range(answers|length) %}
+            <div class="question-result {% if answers[i].is_correct %}correct{% else %}incorrect{% endif %}">
+                <h4>Вопрос {{ i+1 }}: {{ questions[i].question }}</h4>
+                <p><strong>Ваш ответ:</strong> 
+                    {% if answers[i].user_answer is string %}
+                        {{ answers[i].user_answer }}
+                    {% else %}
+                        {{ answers[i].user_answer | join(', ') }}
+                    {% endif %}
+                </p>
+                <p><strong>Правильный ответ:</strong> 
+                    {% if questions[i].correct is string %}
+                        {{ questions[i].correct }}
+                    {% else %}
+                        {{ questions[i].correct | join(', ') }}
+                    {% endif %}
+                </p>
+                <p><strong>Статус:</strong> 
+                    {% if answers[i].is_correct %}
+                        ✅ Правильно
+                    {% else %}
+                        ❌ Неправильно
+                    {% endif %}
+                </p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

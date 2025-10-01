@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Админ-панель</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Админ-панель Quiz System</h1>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                        <div class="flash">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <nav class="admin-nav">
+            <a href="/admin/questions" class="btn">Управление вопросами</a>
+            <a href="/admin/settings" class="btn">Настройки системы</a>
+            <a href="/admin/stats" class="btn">Статистика</a>
+            <a href="/logout" class="btn">Выйти</a>
+        </nav>
+        
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>Всего вопросов</h3>
+                <p class="stat-number">{{ total_questions }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Сессии тестирования</h3>
+                <p class="stat-number">{{ total_sessions }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Средний результат</h3>
+                <p class="stat-number">{{ "%.1f"|format(avg_score) }}%</p>
+            </div>
+        </div>
+        
+        <div class="quick-actions" style="margin-top: 30px;">
+            <h3>Быстрые действия</h3>
+            <button onclick="generateQuestions()" class="btn">Сгенерировать вопросы</button>
+        </div>
+    </div>
+
+    <script>
+        function generateQuestions() {
+            if (confirm('Сгенерировать 1000 вопросов?')) {
+                fetch('/admin/questions/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({count: 1000})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message || data.error);
+                    location.reload();
+                })
+                .catch(error => {
+                    alert('Ошибка: ' + error);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

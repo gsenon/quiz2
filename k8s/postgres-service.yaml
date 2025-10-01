@@ -1,11 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: quiz-postgres
-  namespace: quiz-db
+  name: postgres
 spec:
-  type: ClusterIP
-  ports:
-    - port: 5432
   selector:
-    app: quiz-postgres
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
